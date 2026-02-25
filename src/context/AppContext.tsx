@@ -37,6 +37,8 @@ interface AppContextType {
     attendance: Attendance[];
     clockIn: (email: string) => Promise<void>;
     clockOut: (email: string) => Promise<void>;
+    takeBreak: (email: string) => Promise<void>;
+    endBreak: (email: string) => Promise<void>;
 
     tasks: Task[];
     addTask: (task: Task) => Promise<void>;
@@ -367,6 +369,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const takeBreak = async (email: string) => {
+        try {
+            await addDoc(collection(db, "attendance"), {
+                empEmail: email,
+                type: "Break Start",
+                timestamp: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error("Error starting break: ", e);
+        }
+    };
+
+    const endBreak = async (email: string) => {
+        try {
+            await addDoc(collection(db, "attendance"), {
+                empEmail: email,
+                type: "Break End",
+                timestamp: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error("Error ending break: ", e);
+        }
+    };
+
     const addTask = async (task: Task) => {
         try {
             await addDoc(collection(db, "tasks"), {
@@ -522,7 +548,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             approveRegistration, rejectRegistration, pendingRegistrations,
             leaves, requestLeave, updateLeaveStatus,
             payroll, processPayroll, requestPayslip,
-            attendance, clockIn, clockOut,
+            attendance, clockIn, clockOut, takeBreak, endBreak,
             tasks, addTask, updateTaskStatus,
             documents, requestDocument, uploadDocument, updateDocumentStatus,
             docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,

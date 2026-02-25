@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 export default function DashboardOverview() {
     const [accepting, setAccepting] = useState(false);
     const { role, user, status } = useAuth();
-    const { attendance, clockIn, clockOut, employees, tasks, leaves, documents, requestDocument, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
+    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
 
     const [docTitle, setDocTitle] = useState("");
     const [docRequired, setDocRequired] = useState(false);
@@ -28,9 +28,7 @@ export default function DashboardOverview() {
         setAccepting(true);
         try {
             const res = await fetch('/api/auth/accept-invitation', { method: 'POST' });
-            if (res.ok) {
-                window.location.reload();
-            }
+            if (res.ok) { window.location.reload(); }
         } catch (e) {
             console.error(e);
         } finally {
@@ -60,68 +58,89 @@ export default function DashboardOverview() {
 
     const stats = role === "employer" ? employerStats : employeeStats;
 
-    // Attendance Logic
+    // ── Live timer (ticks every second) ──
     const [now, setNow] = useState(Date.now());
-
     useEffect(() => {
-        const interval = setInterval(() => setNow(Date.now()), 60000);
+        const interval = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, []);
 
+    // ── Today's attendance records ──
     const todayStr = new Date().toDateString();
     const myTodayRecords = attendance
         .filter(a => a.empEmail === user?.email && new Date(a.timestamp).toDateString() === todayStr)
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     const lastRecord = myTodayRecords[myTodayRecords.length - 1];
-    const hasClockedInToday = lastRecord?.type === "Clock In";
-    const hasClockedOutToday = lastRecord?.type === "Clock Out" && myTodayRecords.length > 0;
+    const lastType = lastRecord?.type as string | undefined;
+    const isClockedIn = lastType === "Clock In" || lastType === "Break End";
+    const isClockedOut = lastType === "Clock Out";
+    const isOnBreak = lastType === "Break Start";
+    const hasAnyRecord = myTodayRecords.length > 0;
 
+    // ── Compute worked & break ms ──
     let totalWorkedMs = 0;
+    let totalBreakMs = 0;
     let currentClockIn: number | null = null;
+    let currentBreakStart: number | null = null;
 
     myTodayRecords.forEach(record => {
-        if (record.type === "Clock In") {
-            currentClockIn = new Date(record.timestamp).getTime();
-        } else if (record.type === "Clock Out" && currentClockIn !== null) {
-            totalWorkedMs += (new Date(record.timestamp).getTime() - currentClockIn);
+        const ts = new Date(record.timestamp).getTime();
+        const t = record.type as string;
+        if (t === "Clock In" || t === "Break End") {
+            currentClockIn = ts;
+            currentBreakStart = null;
+        } else if (t === "Clock Out" && currentClockIn !== null) {
+            totalWorkedMs += ts - currentClockIn;
             currentClockIn = null;
+        } else if (t === "Break Start" && currentClockIn !== null) {
+            totalWorkedMs += ts - currentClockIn;
+            currentClockIn = null;
+            currentBreakStart = ts;
+        } else if (t === "Break End" && currentBreakStart !== null) {
+            totalBreakMs += ts - currentBreakStart;
+            currentBreakStart = null;
         }
     });
 
-    if (hasClockedInToday && currentClockIn !== null) {
-        totalWorkedMs += (now - currentClockIn);
-    }
+    if (isClockedIn && currentClockIn !== null) totalWorkedMs += now - currentClockIn;
+    if (isOnBreak && currentBreakStart !== null) totalBreakMs += now - currentBreakStart;
 
-    const totalHours = Math.floor(totalWorkedMs / (1000 * 60 * 60));
-    const totalMinutes = Math.floor((totalWorkedMs % (1000 * 60 * 60)) / (1000 * 60));
-    const formattedWorkingTime = `${totalHours.toString().padStart(2, '0')}:${totalMinutes.toString().padStart(2, '0')}`;
+    const fmtMs = (ms: number) => {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    };
 
-    const getEmployeeAttendanceStatus = () => {
-        if (hasClockedInToday) return "On Duty";
-        if (hasClockedOutToday) return "Shift Completed";
+    const formattedWorkingTime = fmtMs(totalWorkedMs);
+    const formattedBreakTime = fmtMs(totalBreakMs);
+
+    const getStatus = () => {
+        if (isOnBreak) return "On Break";
+        if (isClockedIn) return "On Duty";
+        if (isClockedOut) return "Shift Completed";
         return "Not Clocked In";
     };
 
+    const firstClockIn = myTodayRecords.find(r => (r.type as string) === "Clock In");
+    const clockInTimeStr = firstClockIn
+        ? new Date(firstClockIn.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : null;
+
+    // ── Pending status gate ──
     if (status === "pending") {
         return (
             <div className="flex items-center justify-center min-h-[70vh] p-4 md:p-8">
                 <Card className="max-w-md w-full">
                     <CardHeader className="text-center pt-8">
-                        <Users className="w-10 h-10 text-primary mx-auto mb-2" />
-                        <CardTitle className="text-xl">Finalize Enrollment</CardTitle>
-                        <CardDescription>Welcome to the platform.</CardDescription>
+                        <CardTitle className="text-xl font-bold text-slate-900">Account Pending Approval</CardTitle>
+                        <CardDescription className="text-slate-500 mt-2">
+                            Your employer needs to approve your account before you can access the dashboard.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                        <p className="text-slate-500 text-sm text-center">
-                            Please confirm your invitation to activate your professional profile and access company resources.
-                        </p>
-                        <Button
-                            variant="corporate"
-                            className="w-full h-11"
-                            onClick={handleAcceptInvitation}
-                            disabled={accepting}
-                        >
+                    <CardContent className="pb-8 text-center">
+                        <Button onClick={handleAcceptInvitation} disabled={accepting} className="mt-4">
                             {accepting ? "Processing..." : "Accept Invitation"}
                         </Button>
                     </CardContent>
@@ -132,13 +151,16 @@ export default function DashboardOverview() {
 
     return (
         <div className="space-y-6">
+            {/* ── Greeting ── */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center text-slate-500">
                         <User className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {user?.email?.split("@")[0] || "User"}</h1>
+                        <h1 className="text-xl font-bold text-slate-900">
+                            Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {user?.email?.split("@")[0] || "User"}
+                        </h1>
                         <p className="text-sm text-slate-500">{"Here's what's happening today."}</p>
                     </div>
                 </div>
@@ -153,7 +175,9 @@ export default function DashboardOverview() {
                         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
                             <p className="text-sm font-bold text-amber-800">Action Required — Pending Document{myPendingDocs.length > 1 ? "s" : ""}</p>
-                            <p className="text-xs text-amber-700 mt-0.5">Your employer has requested {myPendingDocs.length} document{myPendingDocs.length > 1 ? "s" : ""} that require{myPendingDocs.length === 1 ? "s" : ""} your attention:</p>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                                Your employer has requested {myPendingDocs.length} document{myPendingDocs.length > 1 ? "s" : ""} that require{myPendingDocs.length === 1 ? "s" : ""} your attention:
+                            </p>
                             <ul className="mt-1.5 space-y-1">
                                 {myPendingDocs.map(d => (
                                     <li key={d.id} className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
@@ -163,12 +187,14 @@ export default function DashboardOverview() {
                                 ))}
                             </ul>
                         </div>
-                        <a href="/dashboard/profile" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">Upload Now →</a>
+                        <a href="/dashboard/profile" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">
+                            Upload Now →
+                        </a>
                     </div>
                 );
             })()}
 
-            {/* Quick Actions & Stats */}
+            {/* ── Stats + Timeclock grid ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat, i) => (
                     <Card key={i} className="shadow-sm border-slate-200">
@@ -184,44 +210,93 @@ export default function DashboardOverview() {
                     </Card>
                 ))}
 
+                {/* ── Timeclock Widget ── */}
                 {role === "employee" && (
-                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl p-5 flex flex-col justify-between gap-4 text-white shadow-md">
-                        <div className="flex flex-col w-full">
-                            <h3 className="text-xs font-semibold text-indigo-100 tracking-wider mb-2">
-                                WORK SHIFT TIMECLOCK
-                            </h3>
-                            <div className="bg-white/10 rounded-lg p-3 flex items-center justify-center gap-3 border border-white/20">
-                                <Clock className="w-6 h-6 text-emerald-300" />
-                                <span className="text-white font-mono text-3xl font-bold tracking-widest">{formattedWorkingTime}</span>
+                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl p-5 flex flex-col justify-between gap-3 text-white shadow-md md:col-span-2 lg:col-span-1">
+                        <div className="flex flex-col w-full gap-2">
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-[11px] font-bold text-indigo-100 tracking-widest uppercase">Work Timeclock</h3>
+                                {clockInTimeStr && (
+                                    <span className="text-[10px] bg-white/10 border border-white/20 rounded-full px-2 py-0.5 font-semibold">
+                                        In: {clockInTimeStr}
+                                    </span>
+                                )}
                             </div>
-                            <div className="mt-3 flex items-center gap-2">
-                                <div className={cn("w-2 h-2 rounded-full", hasClockedInToday && !hasClockedOutToday ? "bg-emerald-400 animate-pulse" : "bg-slate-400")} />
-                                <p className="text-xs font-medium uppercase">{getEmployeeAttendanceStatus()}</p>
+
+                            {/* Main timer */}
+                            <div className="bg-white/10 border border-white/20 rounded-xl p-3 flex items-center justify-center gap-3">
+                                <Clock className="w-5 h-5 text-emerald-300 flex-shrink-0" />
+                                <span className="font-mono text-2xl font-bold tracking-widest text-white">{formattedWorkingTime}</span>
+                            </div>
+
+                            {/* Break time bar */}
+                            {(totalBreakMs > 0 || isOnBreak) && (
+                                <div className="flex items-center justify-between bg-amber-400/20 border border-amber-300/30 rounded-lg px-3 py-2">
+                                    <span className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">☕ Break</span>
+                                    <span className="font-mono text-sm font-bold text-amber-200">{formattedBreakTime}</span>
+                                </div>
+                            )}
+
+                            {/* Status dot */}
+                            <div className="flex items-center gap-2 mt-1">
+                                <div className={cn(
+                                    "w-2 h-2 rounded-full flex-shrink-0",
+                                    isClockedIn ? "bg-emerald-400 animate-pulse" :
+                                        isOnBreak ? "bg-amber-400 animate-pulse" :
+                                            isClockedOut ? "bg-slate-400" : "bg-slate-500"
+                                )} />
+                                <p className="text-[11px] font-semibold uppercase tracking-widest">{getStatus()}</p>
                             </div>
                         </div>
-                        <div className="flex gap-2 w-full mt-2">
-                            {!hasClockedInToday ? (
+
+                        {/* ── Buttons ── */}
+                        <div className="flex gap-2 w-full">
+                            {!hasAnyRecord && (
                                 <button
                                     onClick={() => clockIn(user!.email!)}
-                                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-bold uppercase text-xs transition-colors focus:ring-2 focus:ring-white/50 focus:outline-none"
+                                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-bold uppercase text-xs transition-colors"
                                 >
-                                    Clock In
+                                    ⏵ Clock In
                                 </button>
-                            ) : (
+                            )}
+                            {isClockedIn && (
+                                <>
+                                    <button
+                                        onClick={() => takeBreak(user!.email!)}
+                                        className="flex-1 py-2.5 bg-amber-400 hover:bg-amber-300 text-amber-900 rounded-lg font-bold uppercase text-xs transition-colors"
+                                    >
+                                        ☕ Break
+                                    </button>
+                                    <button
+                                        onClick={() => clockOut(user!.email!)}
+                                        className="flex-1 py-2.5 bg-indigo-900 border border-indigo-400/30 hover:bg-indigo-800 text-white rounded-lg font-bold uppercase text-xs transition-colors"
+                                    >
+                                        ⏹ Clock Out
+                                    </button>
+                                </>
+                            )}
+                            {isOnBreak && (
                                 <button
-                                    onClick={() => clockOut(user!.email!)}
-                                    className="flex-1 py-2.5 bg-indigo-900 border border-indigo-400/30 hover:bg-indigo-800 text-white rounded-lg font-bold uppercase text-xs transition-colors focus:ring-2 focus:ring-white/50 focus:outline-none"
+                                    onClick={() => endBreak(user!.email!)}
+                                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-bold uppercase text-xs transition-colors"
                                 >
-                                    Clock Out
+                                    ▶ Resume Work
                                 </button>
+                            )}
+                            {isClockedOut && (
+                                <div className="w-full text-center text-xs font-semibold text-indigo-200 py-2.5">
+                                    ✓ Shift completed for today
+                                </div>
                             )}
                         </div>
                     </div>
                 )}
             </div>
 
+            {/* ── Main content grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Content Area */}
+                {/* Left: Attendance + Employees */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card className="shadow-sm">
                         <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
@@ -240,14 +315,21 @@ export default function DashboardOverview() {
                                     <tbody className="divide-y divide-slate-100">
                                         {(role === "employer" ? attendance : attendance.filter(a => a.empEmail === user?.email)).slice(0, 8).map((record, i) => (
                                             <tr key={record.id || i} className="hover:bg-slate-50/50">
-                                                <td className="px-5 py-3 text-slate-900 font-medium">{record.empEmail.split('@')[0]}</td>
+                                                <td className="px-5 py-3 text-slate-900 font-medium">{record.empEmail.split("@")[0]}</td>
                                                 <td className="px-5 py-3">
-                                                    <Badge variant={record.type === 'Clock In' ? 'success' : 'secondary'} className="px-2 font-medium">
+                                                    <Badge
+                                                        variant={
+                                                            (record.type as string) === "Clock In" ? "success" :
+                                                                (record.type as string) === "Clock Out" ? "secondary" :
+                                                                    (record.type as string) === "Break Start" ? "warning" : "default"
+                                                        }
+                                                        className="px-2 font-medium"
+                                                    >
                                                         {record.type}
                                                     </Badge>
                                                 </td>
                                                 <td className="px-5 py-3 text-slate-500">
-                                                    {new Date(record.timestamp).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                                                    {new Date(record.timestamp).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
                                                 </td>
                                             </tr>
                                         ))}
@@ -294,7 +376,7 @@ export default function DashboardOverview() {
                     )}
                 </div>
 
-                {/* Sidebar Priority list & Documents */}
+                {/* Right: Priority Tasks + Documents */}
                 <div className="space-y-6">
                     <Card className="shadow-sm">
                         <CardHeader className="p-5 border-b border-slate-100">
@@ -315,14 +397,12 @@ export default function DashboardOverview() {
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-slate-500">
                                             <CalendarDays className="w-3.5 h-3.5" />
-                                            Due on {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            Due on {new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                                         </div>
                                     </div>
                                 ))}
                                 {((role === "employer" ? tasks.filter(t => t.priority === "High") : myPendingTasks).length === 0) && (
-                                    <div className="p-8 text-center text-slate-500 text-sm">
-                                        No priority tasks at the moment.
-                                    </div>
+                                    <div className="p-8 text-center text-slate-500 text-sm">No priority tasks at the moment.</div>
                                 )}
                             </div>
                         </CardContent>
@@ -336,11 +416,14 @@ export default function DashboardOverview() {
                             {role === "employer" && (
                                 <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm relative">
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Request Form</p>
-
+                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                                            <FileText className="w-3.5 h-3.5" /> Request Form
+                                        </p>
                                         <Dialog open={isManageDocsOpen} onOpenChange={setIsManageDocsOpen}>
                                             <DialogTrigger asChild>
-                                                <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-slate-400 hover:text-primary"><Settings className="w-3.5 h-3.5" /></Button>
+                                                <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-slate-400 hover:text-primary">
+                                                    <Settings className="w-3.5 h-3.5" />
+                                                </Button>
                                             </DialogTrigger>
                                             <DialogContent>
                                                 <DialogHeader>
@@ -353,7 +436,7 @@ export default function DashboardOverview() {
                                                             <div key={tpl.id} className="flex items-center justify-between bg-white p-2 border rounded-md shadow-sm">
                                                                 <div>
                                                                     <p className="text-sm font-semibold">{tpl.title}</p>
-                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? 'Mandatory' : 'Optional'}</p>
+                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? "Mandatory" : "Optional"}</p>
                                                                 </div>
                                                                 <Button variant="ghost" size="icon-sm" onClick={() => deleteDocTemplate(tpl.id!)} className="text-rose-500 h-6 w-6">
                                                                     <Trash2 className="w-3.5 h-3.5" />
@@ -362,13 +445,12 @@ export default function DashboardOverview() {
                                                         ))}
                                                         {docTemplates.length === 0 && <p className="text-xs text-slate-500 italic">No document types available.</p>}
                                                     </div>
-
                                                     <div className="space-y-2 pt-2 border-t">
                                                         <Label className="text-xs font-bold">Add Document Type</Label>
-                                                        <Input placeholder="e.g. W2 Tax Form or Offer Letter" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
+                                                        <Input placeholder="e.g. W2 Tax Form" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
                                                         <div className="flex items-center gap-2 mt-2">
                                                             <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-primary" />
-                                                            <Label htmlFor="reqDoc" className="text-xs">Is this document mandatory for active enrollment?</Label>
+                                                            <Label htmlFor="reqDoc" className="text-xs">Is this document mandatory?</Label>
                                                         </div>
                                                         <Button
                                                             variant="corporate"
@@ -388,7 +470,6 @@ export default function DashboardOverview() {
                                                 </div>
                                             </DialogContent>
                                         </Dialog>
-
                                     </div>
                                     <select
                                         className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
@@ -401,10 +482,10 @@ export default function DashboardOverview() {
                                     <select
                                         className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
                                         value={docType}
-                                        onChange={e => { setDocType(e.target.value); }}
+                                        onChange={e => setDocType(e.target.value)}
                                     >
                                         <option value="">Select Required Document Form</option>
-                                        {docTemplates.map(d => <option key={d.id} value={d.title}>{d.title} {d.required ? '*' : ''}</option>)}
+                                        {docTemplates.map(d => <option key={d.id} value={d.title}>{d.title}{d.required ? " *" : ""}</option>)}
                                     </select>
                                     <Button
                                         size="sm"
@@ -415,7 +496,7 @@ export default function DashboardOverview() {
                                                     await requestDocument(docEmpEmail, docType);
                                                     toast.success("Request Executed", { description: "Employee will be formally notified." });
                                                     setDocType("");
-                                                } catch (e) {
+                                                } catch {
                                                     toast.error("Transmission Error", { description: "Unable to request document at this time." });
                                                 }
                                             } else {
