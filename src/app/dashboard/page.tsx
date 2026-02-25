@@ -4,19 +4,24 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Users, AlertTriangle, CalendarDays, CheckCircle, Clock, Check, CheckSquare, ArrowUpRight, ShieldCheck, User } from "lucide-react";
+import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/Dialog";
 
 export default function DashboardOverview() {
     const [accepting, setAccepting] = useState(false);
     const { role, user, status } = useAuth();
-    const { attendance, clockIn, clockOut, employees, tasks, leaves, documents, requestDocument, uploadDocument } = useApp();
+    const { attendance, clockIn, clockOut, employees, tasks, leaves, documents, requestDocument, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
 
     const [docTitle, setDocTitle] = useState("");
-    const [docType, setDocType] = useState("Passport");
+    const [docRequired, setDocRequired] = useState(false);
+    const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
+    const [docType, setDocType] = useState("");
     const [docEmpEmail, setDocEmpEmail] = useState("");
 
     const handleAcceptInvitation = async () => {
@@ -33,38 +38,15 @@ export default function DashboardOverview() {
         }
     };
 
-    if (status === "pending") {
-        return (
-            <div className="flex items-center justify-center min-h-[70vh] p-4 md:p-8">
-                <Card className="max-w-md w-full">
-                    <CardHeader className="text-center pt-8">
-                        <Users className="w-10 h-10 text-primary mx-auto mb-2" />
-                        <CardTitle className="text-xl">Finalize Enrollment</CardTitle>
-                        <CardDescription>Welcome to the organization's platform.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <p className="text-slate-500 text-sm text-center">
-                            Please confirm your invitation to activate your professional profile and access company resources.
-                        </p>
-                        <Button
-                            variant="corporate"
-                            className="w-full h-11"
-                            onClick={handleAcceptInvitation}
-                            disabled={accepting}
-                        >
-                            {accepting ? "Processing..." : "Accept Invitation"}
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
+    const pendingOnboardingCount = employees.filter(e => e.status === "Invited" || e.status === "pending").length;
+    const approvedDocsCount = documents.filter(d => d.status === "Approved").length;
+    const rejectedDocsCount = documents.filter(d => d.status === "Rejected").length;
 
     const employerStats = [
         { title: "Total Employees", value: employees.length.toString(), icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-        { title: "Pending Leaves", value: leaves.filter(l => l.status === "Pending").length.toString(), icon: CalendarDays, color: "text-amber-600", bg: "bg-amber-50" },
-        { title: "Active Tasks", value: tasks.filter(t => t.status !== "Completed").length.toString(), icon: CheckSquare, color: "text-emerald-600", bg: "bg-emerald-50" },
-        { title: "Task Completion", value: tasks.length > 0 ? `${((tasks.filter(t => t.status === "Completed").length / tasks.length) * 100).toFixed(0)}%` : "0%", icon: CheckCircle, color: "text-indigo-600", bg: "bg-indigo-50" },
+        { title: "Pending Onboarding", value: pendingOnboardingCount.toString(), icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+        { title: "Approved Documents", value: approvedDocsCount.toString(), icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
+        { title: "Rejected Documents", value: rejectedDocsCount.toString(), icon: XCircle, color: "text-rose-600", bg: "bg-rose-50" },
     ];
 
     const myTasks = tasks.filter(t => t.assigneeEmail === user?.email);
@@ -121,6 +103,33 @@ export default function DashboardOverview() {
         return "Not Clocked In";
     };
 
+    if (status === "pending") {
+        return (
+            <div className="flex items-center justify-center min-h-[70vh] p-4 md:p-8">
+                <Card className="max-w-md w-full">
+                    <CardHeader className="text-center pt-8">
+                        <Users className="w-10 h-10 text-primary mx-auto mb-2" />
+                        <CardTitle className="text-xl">Finalize Enrollment</CardTitle>
+                        <CardDescription>Welcome to the platform.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <p className="text-slate-500 text-sm text-center">
+                            Please confirm your invitation to activate your professional profile and access company resources.
+                        </p>
+                        <Button
+                            variant="corporate"
+                            className="w-full h-11"
+                            onClick={handleAcceptInvitation}
+                            disabled={accepting}
+                        >
+                            {accepting ? "Processing..." : "Accept Invitation"}
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -129,8 +138,8 @@ export default function DashboardOverview() {
                         <User className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {user?.email?.split("@")[0] || 'User'}</h1>
-                        <p className="text-sm text-slate-500">Here's what's happening today.</p>
+                        <h1 className="text-xl font-bold text-slate-900">Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {user?.email?.split("@")[0] || "User"}</h1>
+                        <p className="text-sm text-slate-500">{"Here's what's happening today."}</p>
                     </div>
                 </div>
             </div>
@@ -138,7 +147,7 @@ export default function DashboardOverview() {
             {/* Quick Actions & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat, i) => (
-                    <Card key={i} className="shadow-none">
+                    <Card key={i} className="shadow-sm border-slate-200">
                         <CardContent className="p-4 flex items-center gap-4">
                             <div className={cn("p-3 rounded-md", stat.bg)}>
                                 <stat.icon className={cn("w-6 h-6", stat.color)} />
@@ -228,6 +237,37 @@ export default function DashboardOverview() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {role === "employer" && (
+                        <Card className="shadow-sm border-slate-200">
+                            <CardHeader className="p-5 border-b border-slate-100">
+                                <CardTitle className="text-base font-semibold">Recently Added Employees</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="divide-y divide-slate-100">
+                                    {employees.slice(0, 5).map(emp => (
+                                        <div key={emp.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 text-xs">
+                                                    {emp.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 text-sm leading-tight">{emp.name}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">{emp.email}</p>
+                                                </div>
+                                            </div>
+                                            <Badge variant={emp.status === "Active" ? "success" : "warning"} className="text-[10px]">
+                                                {emp.status}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                    {employees.length === 0 && (
+                                        <div className="p-8 text-center text-slate-500 text-sm">No employees configured.</div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Sidebar Priority list & Documents */}
@@ -270,52 +310,96 @@ export default function DashboardOverview() {
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                             {role === "employer" && (
-                                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <p className="text-xs font-semibold text-slate-700">Request Document</p>
+                                <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm relative">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Request Form</p>
+
+                                        <Dialog open={isManageDocsOpen} onOpenChange={setIsManageDocsOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-slate-400 hover:text-primary"><Settings className="w-3.5 h-3.5" /></Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Document Templates</DialogTitle>
+                                                    <DialogDescription>Add or remove required onboarding document types.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4 py-3">
+                                                    <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50 max-h-[250px] overflow-y-auto">
+                                                        {docTemplates.map(tpl => (
+                                                            <div key={tpl.id} className="flex items-center justify-between bg-white p-2 border rounded-md shadow-sm">
+                                                                <div>
+                                                                    <p className="text-sm font-semibold">{tpl.title}</p>
+                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? 'Mandatory' : 'Optional'}</p>
+                                                                </div>
+                                                                <Button variant="ghost" size="icon-sm" onClick={() => deleteDocTemplate(tpl.id!)} className="text-rose-500 h-6 w-6">
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                        {docTemplates.length === 0 && <p className="text-xs text-slate-500 italic">No document types available.</p>}
+                                                    </div>
+
+                                                    <div className="space-y-2 pt-2 border-t">
+                                                        <Label className="text-xs font-bold">Add Document Type</Label>
+                                                        <Input placeholder="e.g. W2 Tax Form or Offer Letter" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-primary" />
+                                                            <Label htmlFor="reqDoc" className="text-xs">Is this document mandatory for active enrollment?</Label>
+                                                        </div>
+                                                        <Button
+                                                            variant="corporate"
+                                                            className="w-full mt-2 h-9 text-xs"
+                                                            onClick={() => {
+                                                                if (docTitle.trim()) {
+                                                                    addDocTemplate(docTitle.trim(), docRequired);
+                                                                    setDocTitle("");
+                                                                    setDocRequired(false);
+                                                                    toast.success("Template Added!");
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Type
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                    </div>
                                     <select
-                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary"
+                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
                                         value={docEmpEmail}
                                         onChange={e => setDocEmpEmail(e.target.value)}
                                     >
-                                        <option value="">Select Employee</option>
+                                        <option value="">Select Employee File</option>
                                         {employees.map(e => <option key={e.id} value={e.email}>{e.name} ({e.email})</option>)}
                                     </select>
                                     <select
-                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary"
+                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
                                         value={docType}
-                                        onChange={e => { setDocType(e.target.value); setDocTitle(""); }}
+                                        onChange={e => { setDocType(e.target.value); }}
                                     >
-                                        {["Passport", "National ID Card", "Address Proof", "Tax Form", "Signed Offer Letter", "Bank Details", "Other..."].map(d => <option key={d} value={d}>{d}</option>)}
+                                        <option value="">Select Required Document Form</option>
+                                        {docTemplates.map(d => <option key={d.id} value={d.title}>{d.title} {d.required ? '*' : ''}</option>)}
                                     </select>
-                                    {docType === "Other..." && (
-                                        <input
-                                            type="text"
-                                            className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary"
-                                            placeholder="Custom Document Name"
-                                            value={docTitle}
-                                            onChange={e => setDocTitle(e.target.value)}
-                                        />
-                                    )}
                                     <Button
                                         size="sm"
-                                        className="w-full bg-slate-900 text-white hover:bg-slate-800"
+                                        className="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold"
                                         onClick={async () => {
-                                            const finalTitle = docType === "Other..." ? docTitle : docType;
-                                            if (docEmpEmail && finalTitle) {
+                                            if (docEmpEmail && docType) {
                                                 try {
-                                                    await requestDocument(docEmpEmail, finalTitle);
-                                                    toast.success("Request Sent", { description: "Employee has been formally notified." });
-                                                    setDocTitle("");
-                                                    setDocType("Passport");
+                                                    await requestDocument(docEmpEmail, docType);
+                                                    toast.success("Request Executed", { description: "Employee will be formally notified." });
+                                                    setDocType("");
                                                 } catch (e) {
                                                     toast.error("Transmission Error", { description: "Unable to request document at this time." });
                                                 }
                                             } else {
-                                                toast.error("Form Incomplete", { description: "Please select an employee and document." });
+                                                toast.error("Form Incomplete", { description: "Please select an employee and document template." });
                                             }
                                         }}
                                     >
-                                        Request
+                                        Issue Request
                                     </Button>
                                 </div>
                             )}
@@ -328,26 +412,32 @@ export default function DashboardOverview() {
                                                 <p className="text-sm border-slate-200 font-semibold">{doc.title}</p>
                                                 {role === "employer" && <p className="text-[10px] text-slate-500">{doc.empEmail}</p>}
                                             </div>
-                                            <Badge variant={doc.status === "Uploaded" ? "success" : "warning"} className="text-[10px] h-5">
+                                            <Badge variant={doc.status === "Approved" ? "success" : doc.status === "Rejected" ? "destructive" : "warning"} className="text-[10px] h-5">
                                                 {doc.status}
                                             </Badge>
                                         </div>
-                                        {role === "employee" && doc.status === "Pending" && (
+                                        {role === "employee" && (doc.status === "Pending" || doc.status === "Rejected") && (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className="text-xs w-full mt-2 h-7 rounded"
                                                 onClick={() => {
-                                                    // Simulate upload
                                                     uploadDocument(doc.id!, "https://example.com/uploaded");
+                                                    toast.success("File Uploaded", { description: `Securely transmitted ${doc.title}.` });
                                                 }}
                                             >
                                                 Upload Now
                                             </Button>
                                         )}
-                                        {doc.status === "Uploaded" && (
+                                        {role === "employer" && doc.status === "Uploaded" && (
+                                            <div className="flex items-center gap-2 mt-2 w-full">
+                                                <Button size="sm" variant="outline" className="flex-1 h-7 text-xs border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100" onClick={() => updateDocumentStatus(doc.id!, "Approved")}>Approve</Button>
+                                                <Button size="sm" variant="outline" className="flex-1 h-7 text-xs border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100" onClick={() => updateDocumentStatus(doc.id!, "Rejected")}>Reject</Button>
+                                            </div>
+                                        )}
+                                        {(doc.status === "Uploaded" || doc.status === "Approved") && role === "employee" && (
                                             <div className="flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                                                <CheckCircle className="w-3 h-3" /> File Uploaded
+                                                <CheckCircle className="w-3 h-3" /> {doc.status === "Approved" ? "Verified & Approved" : "Processing Verification"}
                                             </div>
                                         )}
                                     </div>

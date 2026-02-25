@@ -13,10 +13,11 @@ import { Search, Plus, MoreHorizontal, UserPlus, Mail, ShieldCheck, AlertTriangl
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function EmployeesPage() {
     const { role } = useAuth();
-    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions } = useApp();
+    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
     const [showForm, setShowForm] = useState(false);
 
@@ -44,6 +45,18 @@ export default function EmployeesPage() {
     const handleSavePermissions = () => {
         if (selectedEmp) {
             updateEmployeePermissions(selectedEmp.id, selectedEmp.permissions || []);
+            toast.success("Permissions Updated", { description: `Access tokens updated for ${selectedEmp.name}.` });
+            createNotification({
+                title: "Security Clearance Updated",
+                message: `Permissions have been redefined for ${selectedEmp.name}.`,
+                targetRole: "employer"
+            });
+            createNotification({
+                title: "Clearance Updated",
+                message: "Your internal access clearances have been actively updated by central administration.",
+                targetEmail: selectedEmp.email,
+                targetRole: "employee"
+            });
             setPermissionsModalOpen(false);
             setSelectedEmp(null);
         }
@@ -87,6 +100,12 @@ export default function EmployeesPage() {
             });
 
             if (response.ok) {
+                toast.success("Employee Successfully Onboarded!", { description: `${empName} has been added to the Workforce Database.` });
+                createNotification({
+                    title: "System Onboarding Success",
+                    message: `Operative ${empName} (${empEmail}) was added to the ${empDept} unit as a ${empRole}.`,
+                    targetRole: "employer"
+                });
                 setShowForm(false);
                 setEmpName("");
                 setEmpEmail("");
@@ -96,9 +115,21 @@ export default function EmployeesPage() {
             } else {
                 const data = await response.json();
                 setError(data.error || "Failed to add employee");
+                toast.error("Process Failed", { description: data.error || "Could not complete onboarding. Check permissions or network." });
+                createNotification({
+                    title: "Onboarding Terminated",
+                    message: `Internal System Error while trying to recruit ${empEmail}: ${data.error || "Network error"}`,
+                    targetRole: "employer"
+                });
             }
-        } catch (err) {
+        } catch (err: any) {
             setError("A network error occurred.");
+            toast.error("Network Exception", { description: "Please ensure you have a stable connection and the server is running." });
+            createNotification({
+                title: "Network Exception Incident",
+                message: `Failed secure connection to recruitment servers involving ${empEmail}.`,
+                targetRole: "employer"
+            });
         } finally {
             setLoading(false);
         }
