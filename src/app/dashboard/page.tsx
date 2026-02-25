@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle } from "lucide-react";
+import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -143,6 +143,30 @@ export default function DashboardOverview() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Pending Documents Warning Banner (Employee only) ── */}
+            {role === "employee" && (() => {
+                const myPendingDocs = documents.filter(d => d.empEmail === user?.email && d.status === "Pending");
+                if (myPendingDocs.length === 0) return null;
+                return (
+                    <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl p-4 shadow-sm">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-amber-800">Action Required — Pending Document{myPendingDocs.length > 1 ? "s" : ""}</p>
+                            <p className="text-xs text-amber-700 mt-0.5">Your employer has requested {myPendingDocs.length} document{myPendingDocs.length > 1 ? "s" : ""} that require{myPendingDocs.length === 1 ? "s" : ""} your attention:</p>
+                            <ul className="mt-1.5 space-y-1">
+                                {myPendingDocs.map(d => (
+                                    <li key={d.id} className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                                        {d.title}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <a href="/dashboard/profile" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">Upload Now →</a>
+                    </div>
+                );
+            })()}
 
             {/* Quick Actions & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

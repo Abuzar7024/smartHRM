@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch } from "firebase/firestore";
 
 export type Employee = { id?: string; name: string; role: string; department: string; status: string; email: string; leaveBalance?: number; permissions?: string[]; joinDate?: string };
 export type Leave = { id?: string; empName: string; empEmail: string; type: string; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string };
@@ -19,8 +19,12 @@ interface AppContextType {
     employees: Employee[];
     addEmployee: (emp: Employee) => Promise<void>;
     removeEmployee: (id: string) => Promise<void>;
+    deleteEmployeeCascade: (empId: string, empEmail: string) => Promise<void>;
     updateLeaveBalance: (id: string, balance: number) => Promise<void>;
     updateEmployeePermissions: (id: string, permissions: string[]) => Promise<void>;
+    approveRegistration: (uid: string, empId: string) => Promise<void>;
+    rejectRegistration: (uid: string) => Promise<void>;
+    pendingRegistrations: { uid: string; email: string; companyName?: string }[];
 
     leaves: Leave[];
     requestLeave: (leave: Leave) => Promise<void>;
@@ -79,6 +83,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [pendingRegistrations, setPendingRegistrations] = useState<{ uid: string; email: string; companyName?: string }[]>([]);
     const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([
         { id: "def_passport", title: "Passport", required: true },
         { id: "def_address", title: "Address Proof", required: true },
@@ -129,6 +134,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 }
             }, (error) => console.log("Firebase DocTemplates Error Setup:", error.message));
 
+            // Listen for pending employee registrations (users with status=pending)
+            const unsubPending = onSnapshot(
+                query(collection(db, "users"), where("status", "==", "pending")),
+                (snapshot) => {
+                    setPendingRegistrations(snapshot.docs.map(d => ({
+                        uid: d.id,
+                        email: d.data().email as string,
+                        companyName: d.data().companyName as string | undefined,
+                    })));
+                },
+                (error) => console.log("Firebase Pending Error:", error.message)
+            );
+
             return () => {
                 unsubEmployees();
                 unsubLeaves();
@@ -140,6 +158,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 unsubTeams();
                 unsubChat();
                 unsubDocTemplates();
+                unsubPending();
             };
         } catch (e) {
             console.error("Firebase config missing or invalid.", e);
@@ -163,6 +182,75 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await deleteDoc(doc(db, "employees", id));
         } catch (e) {
             console.error("Error removing employee: ", e);
+        }
+    };
+
+    // Full cascade delete: remove employee + all their data across collections
+    const deleteEmployeeCascade = async (empId: string, empEmail: string) => {
+        try {
+            const batch = writeBatch(db);
+            // Delete employee record
+            batch.delete(doc(db, "employees", empId));
+
+            // Collections that store empEmail
+            const emailCollections = ["documents", "leaves", "payroll", "attendance", "notifications", "chat_messages"];
+            for (const col of emailCollections) {
+                const fieldName = col === "chat_messages" ? "sender" :
+                    col === "leaves" ? "empEmail" :
+                        col === "notifications" ? "targetEmail" : "empEmail";
+                const q = query(collection(db, col), where(fieldName, "==", empEmail));
+                const snap = await getDocs(q);
+                snap.docs.forEach(d => batch.delete(d.ref));
+                // Also delete chat messages where they are receiver
+                if (col === "chat_messages") {
+                    const q2 = query(collection(db, col), where("receiver", "==", empEmail));
+                    const snap2 = await getDocs(q2);
+                    snap2.docs.forEach(d => batch.delete(d.ref));
+                }
+            }
+
+            // Tasks assigned to this employee
+            const tasksQ = query(collection(db, "tasks"), where("assigneeEmail", "==", empEmail));
+            const tasksSnap = await getDocs(tasksQ);
+            tasksSnap.docs.forEach(d => batch.delete(d.ref));
+
+            // Remove from teams.memberEmails
+            const teamsQ = query(collection(db, "teams"), where("memberEmails", "array-contains", empEmail));
+            const teamsSnap = await getDocs(teamsQ);
+            teamsSnap.docs.forEach(d => {
+                const current: string[] = d.data().memberEmails || [];
+                batch.update(d.ref, { memberEmails: current.filter(e => e !== empEmail) });
+            });
+
+            await batch.commit();
+        } catch (e) {
+            console.error("Error deleting employee cascade:", e);
+            throw e;
+        }
+    };
+
+    const approveRegistration = async (uid: string, empId: string) => {
+        try {
+            await updateDoc(doc(db, "users", uid), { status: "active" });
+            await updateDoc(doc(db, "employees", empId), { status: "Active" });
+            await addDoc(collection(db, "notifications"), {
+                title: "Registration Approved",
+                message: "Your registration has been approved. Welcome aboard!",
+                timestamp: new Date().toISOString(),
+                isRead: false,
+                targetEmail: (await getDocs(query(collection(db, "users"), where("__name__", "==", uid)))).docs[0]?.data().email,
+                targetRole: "employee"
+            });
+        } catch (e) {
+            console.error("Error approving registration:", e);
+        }
+    };
+
+    const rejectRegistration = async (uid: string) => {
+        try {
+            await updateDoc(doc(db, "users", uid), { status: "rejected" });
+        } catch (e) {
+            console.error("Error rejecting registration:", e);
         }
     };
 
@@ -402,7 +490,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <AppContext.Provider value={{
-            employees, addEmployee, removeEmployee, updateLeaveBalance, updateEmployeePermissions,
+            employees, addEmployee, removeEmployee, deleteEmployeeCascade, updateLeaveBalance, updateEmployeePermissions,
+            approveRegistration, rejectRegistration, pendingRegistrations,
             leaves, requestLeave, updateLeaveStatus,
             payroll, processPayroll, requestPayslip,
             attendance, clockIn, clockOut,

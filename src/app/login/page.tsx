@@ -53,7 +53,23 @@ export default function LoginPage() {
                 // If it's a login check if the employee is registered but not active
                 const cred = await signInWithEmailAndPassword(auth, email, password);
                 user = cred.user;
-                // Note: user status pending check happens in the dashboard context
+                // Check if the user's status is pending or rejected
+                const userDoc = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
+                if (!userDoc.empty) {
+                    const status = userDoc.docs[0].data().status;
+                    if (status === "pending") {
+                        await auth.signOut();
+                        setError("Your account is pending employer approval. Please wait for your employer to approve your registration.");
+                        setLoading(false);
+                        return;
+                    }
+                    if (status === "rejected") {
+                        await auth.signOut();
+                        setError("Your registration was rejected. Please contact your employer.");
+                        setLoading(false);
+                        return;
+                    }
+                }
             } else {
                 if (!companyName.trim()) {
                     throw new Error(role === "employer" ? "Company name is required for Employers." : "Please specify the company you are joining.");
@@ -77,14 +93,24 @@ export default function LoginPage() {
                         email: user.email,
                         role: role,
                         companyName: companyName,
+                        // Employees need employer approval; employers are active immediately
+                        status: role === "employee" ? "pending" : "active",
                         createdAt: new Date(),
                     });
                 } catch (firestoreError: any) {
                     throw new Error("Account created but profile setup failed. Please contact admin.");
                 }
+
+                // Employees: don't let them into the dashboard yet — show pending message
+                if (role === "employee") {
+                    await auth.signOut();
+                    setMsg("Registration submitted! Your employer will review and approve your access. You will be able to log in once approved.");
+                    setLoading(false);
+                    return;
+                }
             }
 
-            const idToken = await user.getIdToken();
+            const idToken = await user!.getIdToken();
             const response = await fetch('/api/auth/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

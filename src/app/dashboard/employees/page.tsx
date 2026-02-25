@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Search, Plus, MoreHorizontal, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar } from "lucide-react";
+import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,11 @@ import { toast } from "sonner";
 
 export default function EmployeesPage() {
     const { role } = useAuth();
-    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification } = useApp();
+    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
     const [showForm, setShowForm] = useState(false);
+    const [deletingEmp, setDeletingEmp] = useState<{ id: string; name: string; email: string } | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     // Form State
     const [empName, setEmpName] = useState("");
@@ -59,6 +61,20 @@ export default function EmployeesPage() {
             });
             setPermissionsModalOpen(false);
             setSelectedEmp(null);
+        }
+    };
+
+    const handleDeleteEmployee = async () => {
+        if (!deletingEmp) return;
+        setDeleteLoading(true);
+        try {
+            await deleteEmployeeCascade(deletingEmp.id, deletingEmp.email);
+            toast.success("Employee Removed", { description: `${deletingEmp.name} and all their records have been permanently deleted.` });
+            setDeletingEmp(null);
+        } catch {
+            toast.error("Delete Failed", { description: "Could not delete employee. Please try again." });
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -311,13 +327,10 @@ export default function EmployeesPage() {
                                         <Button
                                             variant="ghost"
                                             size="icon-sm"
-                                            className="text-slate-400 rounded-lg hover:text-primary"
-                                            onClick={() => {
-                                                setDetailsEmp(emp);
-                                                setDetailsModalOpen(true);
-                                            }}
+                                            className="text-slate-400 rounded-lg hover:text-rose-600 hover:bg-rose-50"
+                                            onClick={() => setDeletingEmp({ id: emp.id!, name: emp.name, email: emp.email })}
                                         >
-                                            <MoreHorizontal className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -336,6 +349,79 @@ export default function EmployeesPage() {
                     </Table>
                 </div>
             </Card>
+
+            {/* ── Pending Registrations ── */}
+            {pendingRegistrations.length > 0 && (
+                <Card className="border-amber-200 bg-amber-50 shadow-none">
+                    <CardHeader className="pb-2 pt-4 px-5">
+                        <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            Pending Employee Registration Requests ({pendingRegistrations.length})
+                        </CardTitle>
+                        <CardDescription className="text-amber-700 text-xs">These users registered and are awaiting your approval to join your organization.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-4 space-y-2">
+                        {pendingRegistrations.map(reg => {
+                            const matchedEmp = employees.find(e => e.email === reg.email);
+                            return (
+                                <div key={reg.uid} className="flex items-center justify-between bg-white border border-amber-200 rounded-lg p-3 gap-3">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">{reg.email}</p>
+                                        {reg.companyName && <p className="text-xs text-slate-500">Company: {reg.companyName}</p>}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {matchedEmp ? (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    onClick={() => { approveRegistration(reg.uid, matchedEmp.id!); toast.success("Approved!", { description: `${reg.email} can now log in.` }); }}
+                                                >
+                                                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 border-rose-200 text-rose-600 hover:bg-rose-50"
+                                                    onClick={() => { rejectRegistration(reg.uid); toast.error("Rejected", { description: `${reg.email} has been denied access.` }); }}
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <p className="text-xs text-amber-600 italic">Add this email as an employee first to approve</p>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* ── Delete Confirm Dialog ── */}
+            <Dialog open={!!deletingEmp} onOpenChange={(v) => { if (!v) setDeletingEmp(null); }}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-rose-600">
+                            <Trash2 className="w-5 h-5" /> Delete Employee
+                        </DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete <strong>{deletingEmp?.name}</strong> and ALL their associated data including tasks, documents, leaves, payroll records, and chat messages. This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 mt-4">
+                        <Button variant="ghost" onClick={() => setDeletingEmp(null)} disabled={deleteLoading}>Cancel</Button>
+                        <Button
+                            className="bg-rose-600 hover:bg-rose-700 text-white"
+                            onClick={handleDeleteEmployee}
+                            disabled={deleteLoading}
+                        >
+                            {deleteLoading ? "Deleting..." : "Yes, Delete Permanently"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* ── Permissions Modal ── */}
             <Dialog open={permissionsModalOpen} onOpenChange={setPermissionsModalOpen}>
