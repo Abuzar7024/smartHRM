@@ -22,8 +22,10 @@ service cloud.firestore {
 
         // Employees Collection
         match /employees/{docId} {
-            allow read: if request.auth != null; 
-            allow write: if isEmployer();       
+            // Allow unauthenticated reads so the registration page can verify
+            // the employee exists before creating an account
+            allow read: if true;
+            allow write: if isEmployer();
         }
 
         // Leaves Collection
@@ -85,6 +87,12 @@ service cloud.firestore {
 
         match /chat_reads/{docId} {
             allow read, write: if request.auth != null;
+        }
+
+        // Companies — publicly readable so employees can search during registration
+        match /companies/{docId} {
+            allow read: if true;
+            allow write: if isEmployer();
         }
 
     }

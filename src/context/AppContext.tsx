@@ -14,6 +14,7 @@ export type NotificationItem = { id?: string; title: string; message: string; ti
 export type DocTemplate = { id?: string; title: string; required: boolean };
 export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; teamType: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Hierarchical" | "Matrix"; createdAt: string; };
 export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; };
+export type Job = { id?: string; title: string; department: string; applicants: number; type: string; postedAt: string; status: "Active" | "Closed" };
 
 interface AppContextType {
     employees: Employee[];
@@ -59,6 +60,10 @@ interface AppContextType {
     createNotification: (notif: Omit<NotificationItem, "id" | "timestamp" | "isRead">) => Promise<void>;
     markNotificationRead: (id: string) => Promise<void>;
 
+    jobs: Job[];
+    addJob: (job: Omit<Job, "id" | "postedAt" | "applicants">) => Promise<void>;
+    updateJobStatus: (id: string, status: "Active" | "Closed") => Promise<void>;
+
     teams: Team[];
     createTeam: (team: Omit<Team, "id" | "createdAt">) => Promise<void>;
     updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
@@ -86,6 +91,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [jobs, setJobs] = useState<Job[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [pendingRegistrations, setPendingRegistrations] = useState<{ uid: string; email: string; companyName?: string }[]>([]);
@@ -125,6 +131,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const unsubNotifications = onSnapshot(query(collection(db, "notifications"), orderBy("timestamp", "desc")), (snapshot) => {
                 setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificationItem)));
             }, (error) => console.log("Firebase Notifications Error Setup:", error.message));
+
+            const unsubJobs = onSnapshot(query(collection(db, "jobs"), orderBy("postedAt", "desc")), (snapshot) => {
+                setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+            }, (error) => console.log("Firebase Jobs Error Setup:", error.message));
 
             const unsubTeams = onSnapshot(query(collection(db, "teams"), orderBy("createdAt", "desc")), (snapshot) => {
                 setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team)));
@@ -171,6 +181,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 unsubTasks();
                 unsubDocuments();
                 unsubNotifications();
+                unsubJobs();
                 unsubTeams();
                 unsubChat();
                 unsubDocTemplates();
@@ -564,6 +575,27 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const addJob = async (job: Omit<Job, "id" | "postedAt" | "applicants">) => {
+        try {
+            await addDoc(collection(db, "jobs"), {
+                ...job,
+                applicants: 0,
+                postedAt: new Date().toISOString(),
+                status: "Active"
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const updateJobStatus = async (id: string, status: "Active" | "Closed") => {
+        try {
+            await updateDoc(doc(db, "jobs", id), { status });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     const sendMessage = async (msg: Omit<ChatMessage, "id" | "timestamp">) => {
         try {
             await addDoc(collection(db, "chat_messages"), {
@@ -586,6 +618,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             documents, requestDocument, sendDocumentReminder, uploadDocument, updateDocumentStatus,
             docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
             notifications, createNotification, markNotificationRead,
+            jobs, addJob, updateJobStatus,
             teams, createTeam, updateTeam, deleteTeam,
             chatMessages, sendMessage, markChatRead, chatReadTimestamps
         }}>

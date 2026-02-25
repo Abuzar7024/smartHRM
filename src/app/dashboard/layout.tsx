@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
 const Sidebar = dynamic(() => import("@/components/Sidebar").then(mod => mod.Sidebar), {
@@ -22,6 +22,7 @@ export default function DashboardLayout({
     const { user, loading, role } = useAuth();
     const { leaves, notifications, markNotificationRead } = useApp();
     const router = useRouter();
+    const pathname = usePathname();
     const [isClient, setIsClient] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -42,6 +43,19 @@ export default function DashboardLayout({
     );
 
     const unreadCount = myNotifications.filter(n => !n.isRead).length;
+
+    // Map notification title keywords → dashboard routes
+    const getNotifRoute = (title: string, message: string): string => {
+        const t = (title + " " + message).toLowerCase();
+        if (t.includes("document") || t.includes("upload") || t.includes("file")) return "/dashboard/profile";
+        if (t.includes("leave") || t.includes("time off")) return "/dashboard/leaves";
+        if (t.includes("task") || t.includes("assigned")) return "/dashboard/tasks";
+        if (t.includes("chat") || t.includes("message")) return "/dashboard/chat";
+        if (t.includes("payroll") || t.includes("payslip") || t.includes("salary")) return "/dashboard/payroll";
+        if (t.includes("registration") || t.includes("approved") || t.includes("welcome")) return "/dashboard";
+        if (t.includes("attendance") || t.includes("clock")) return "/dashboard";
+        return "/dashboard";
+    };
 
     // Trigger toast for new notifications
     useEffect(() => {
@@ -120,7 +134,10 @@ export default function DashboardLayout({
                                         myNotifications.slice(0, 10).map(notif => (
                                             <div
                                                 key={notif.id}
-                                                onClick={() => !notif.isRead && markNotificationRead(notif.id!)}
+                                                onClick={() => {
+                                                    if (!notif.isRead) markNotificationRead(notif.id!);
+                                                    router.push(getNotifRoute(notif.title, notif.message));
+                                                }}
                                                 className={cn(
                                                     "p-3 rounded-lg flex items-start gap-3 transition-colors cursor-pointer",
                                                     notif.isRead ? "bg-slate-50 opacity-70" : "bg-primary/5 hover:bg-primary/10"
