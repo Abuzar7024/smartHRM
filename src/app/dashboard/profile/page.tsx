@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, MapPin, Building, Briefcase, ShieldCheck } from "lucide-center";
-// Note: lucide-react (correcting hypothetical typo in my trace)
 import { LucideIcon, Mail as MailIcon, Phone as PhoneIcon, MapPin as MapPinIcon, Building as BuildingIcon, Briefcase as BriefcaseIcon, ShieldCheck as ShieldIcon, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
