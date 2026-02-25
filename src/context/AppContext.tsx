@@ -5,11 +5,11 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch } from "firebase/firestore";
 
 export type Employee = { id?: string; name: string; role: string; department: string; status: string; email: string; leaveBalance?: number; permissions?: string[]; joinDate?: string };
-export type Leave = { id?: string; empName: string; empEmail: string; type: string; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string };
+export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
-export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out"; timestamp: string };
+export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out" | "Break Start" | "Break End"; timestamp: string };
 export type Task = { id?: string; title: string; description: string; assigneeId: string; assigneeEmail: string; status: "Pending" | "In Progress" | "Completed"; priority: "Low" | "Medium" | "High"; dueDate: string; createdAt: string };
-export type EmployeeDocument = { id?: string; empEmail: string; title: string; status: "Pending" | "Uploaded" | "Approved" | "Rejected"; url?: string };
+export type EmployeeDocument = { id?: string; empEmail: string; title: string; status: "Pending" | "Uploaded" | "Approved" | "Rejected"; url?: string; requestedAt?: string };
 export type NotificationItem = { id?: string; title: string; message: string; timestamp: string; isRead: boolean; targetEmail?: string; targetRole?: "employer" | "employee" };
 export type DocTemplate = { id?: string; title: string; required: boolean };
 export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; teamType: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Hierarchical" | "Matrix"; createdAt: string; };
@@ -46,6 +46,7 @@ interface AppContextType {
 
     documents: EmployeeDocument[];
     requestDocument: (email: string, title: string) => Promise<void>;
+    sendDocumentReminder: (email: string, title: string) => Promise<void>;
     uploadDocument: (id: string, url: string) => Promise<void>;
     updateDocumentStatus: (id: string, status: "Approved" | "Rejected") => Promise<void>;
 
@@ -305,6 +306,22 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const updateLeaveStatus = async (id: string, status: "Approved" | "Denied") => {
         try {
             await updateDoc(doc(db, "leaves", id), { status });
+            // Deduct from leave balance when approved
+            if (status === "Approved") {
+                const leaveDoc = leaves.find(l => l.id === id);
+                if (leaveDoc) {
+                    const emp = employees.find(e => e.email === leaveDoc.empEmail);
+                    if (emp?.id) {
+                        const deduction = leaveDoc.isHalfDay
+                            ? 0.5
+                            : leaveDoc.days ?? Math.max(1, Math.ceil(
+                                (new Date(leaveDoc.to).getTime() - new Date(leaveDoc.from).getTime()) / 86400000 + 1
+                            ));
+                        const newBalance = Math.max(0, (emp.leaveBalance ?? 0) - deduction);
+                        await updateDoc(doc(db, "employees", emp.id), { leaveBalance: newBalance });
+                    }
+                }
+            }
         } catch (e) {
             console.error("Error updating leave: ", e);
         }
@@ -414,10 +431,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const requestDocument = async (email: string, title: string) => {
         try {
-            await addDoc(collection(db, "documents"), { empEmail: email, title, status: "Pending" });
+            await addDoc(collection(db, "documents"), { empEmail: email, title, status: "Pending", requestedAt: new Date().toISOString() });
+            // Persistent in-app notification for the employee
             await addDoc(collection(db, "notifications"), {
-                title: "Document Requested",
-                message: `HR has requested a document: ${title}`,
+                title: "📄 Document Required",
+                message: `Your employer has requested a document: "${title}". Please upload it as soon as possible.`,
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: email,
@@ -425,6 +443,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
         } catch (e) {
             console.error("Error requesting document:", e);
+        }
+    };
+
+    const sendDocumentReminder = async (email: string, title: string) => {
+        try {
+            await addDoc(collection(db, "notifications"), {
+                title: "⚠️ Document Reminder",
+                message: `Reminder: You still have a pending document request for "${title}". Please upload it immediately.`,
+                timestamp: new Date().toISOString(),
+                isRead: false,
+                targetEmail: email,
+                targetRole: "employee"
+            });
+        } catch (e) {
+            console.error("Error sending reminder:", e);
         }
     };
 
@@ -550,7 +583,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             payroll, processPayroll, requestPayslip,
             attendance, clockIn, clockOut, takeBreak, endBreak,
             tasks, addTask, updateTaskStatus,
-            documents, requestDocument, uploadDocument, updateDocumentStatus,
+            documents, requestDocument, sendDocumentReminder, uploadDocument, updateDocumentStatus,
             docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
             notifications, createNotification, markNotificationRead,
             teams, createTeam, updateTeam, deleteTeam,

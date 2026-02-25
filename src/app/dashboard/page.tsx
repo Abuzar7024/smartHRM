@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 export default function DashboardOverview() {
     const [accepting, setAccepting] = useState(false);
     const { role, user, status } = useAuth();
-    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
+    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, sendDocumentReminder, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
 
     const [docTitle, setDocTitle] = useState("");
     const [docRequired, setDocRequired] = useState(false);
@@ -293,6 +293,66 @@ export default function DashboardOverview() {
                     </div>
                 )}
             </div>
+
+            {/* ── Pending Submissions Panel (Employer only) ── */}
+            {role === "employer" && (() => {
+                const pendingDocs = documents.filter(d => d.status === "Pending");
+                if (pendingDocs.length === 0) return null;
+                return (
+                    <div className="border border-rose-200 bg-rose-50 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-rose-500" />
+                                <h2 className="text-sm font-bold text-rose-800">
+                                    Pending Document Submissions ({pendingDocs.length})
+                                </h2>
+                            </div>
+                            <span className="text-[10px] font-semibold text-rose-500 uppercase tracking-wider">Awaiting Upload</span>
+                        </div>
+                        <div className="space-y-2">
+                            {pendingDocs.map(doc => {
+                                const emp = employees.find(e => e.email === doc.empEmail);
+                                return (
+                                    <div key={doc.id} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-4 py-3 gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center font-bold text-rose-600 text-xs flex-shrink-0">
+                                                {(emp?.name || doc.empEmail).charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-slate-900 truncate">
+                                                    {emp?.name || doc.empEmail.split("@")[0]}
+                                                </p>
+                                                <p className="text-xs text-rose-600 font-medium truncate">
+                                                    📄 {doc.title}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {doc.requestedAt && (
+                                                <span className="text-[10px] text-slate-400 hidden sm:block">
+                                                    Requested {new Date(doc.requestedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                                                </span>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                className="h-7 text-[11px] bg-rose-500 hover:bg-rose-600 text-white font-bold px-3"
+                                                onClick={async () => {
+                                                    await sendDocumentReminder(doc.empEmail, doc.title);
+                                                    toast.success("Reminder Sent", {
+                                                        description: `${emp?.name || doc.empEmail} has been notified about "${doc.title}"`,
+                                                    });
+                                                }}
+                                            >
+                                                🔔 Remind
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Main content grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
