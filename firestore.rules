@@ -10,9 +10,11 @@ service cloud.firestore {
 
         // Users Collection
         match /users/{userId} {
-            // Users can read and create their own document
-            allow read, create: if request.auth != null && request.auth.uid == userId;
-            // Employers and the user themselves can update their document (except role for non-admins)
+            // Any authenticated user can read profiles (needed for chat directory)
+            allow read: if request.auth != null;
+            // Users can create their own document on registration
+            allow create: if request.auth != null && request.auth.uid == userId;
+            // Employers and the user themselves can update their document
             allow update: if request.auth != null && (request.auth.uid == userId || isEmployer());
             // Only employers can delete
             allow delete: if isEmployer(); 
