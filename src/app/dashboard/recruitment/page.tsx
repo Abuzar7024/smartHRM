@@ -101,7 +101,7 @@ export default function RecruitmentPage() {
                                         <select
                                             className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20"
                                             value={type}
-                                            onChange={(e) => setType(e.target.value as any)}
+                                            onChange={(e) => setType(e.target.value as "Full-time" | "Contract" | "Part-time")}
                                         >
                                             <option value="Full-time">Full-time</option>
                                             <option value="Contract">Contract</option>
@@ -150,7 +150,7 @@ export default function RecruitmentPage() {
                     <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                         <Briefcase className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                         <p className="text-slate-500 font-medium">No active job requisitions found.</p>
-                        <p className="text-slate-400 text-xs mt-1">Click "Create Requisition" to add your first job post.</p>
+                        <p className="text-slate-400 text-xs mt-1">Click &quot;Create Requisition&quot; to add your first job post.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

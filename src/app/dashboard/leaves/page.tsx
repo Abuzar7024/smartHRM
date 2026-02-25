@@ -393,7 +393,7 @@ export default function LeavesPage() {
                                         <TableCell className="py-4">
                                             <LeaveTypeBadge type={leave.type} isHalfDay={leave.isHalfDay} />
                                             <div className="text-xs text-slate-400 italic line-clamp-1 truncate max-w-[200px] mt-1">
-                                                "{leave.description || "No notes"}"
+                                                &quot;{leave.description || "No notes"}&quot;
                                             </div>
                                         </TableCell>
                                         <TableCell className="py-4">

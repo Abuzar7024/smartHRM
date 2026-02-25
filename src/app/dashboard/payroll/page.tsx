@@ -19,7 +19,7 @@ export default function PayrollPage() {
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6">
                 <ShieldCheck className="w-12 h-12 text-slate-200 mb-4" />
                 <h2 className="text-xl font-bold text-slate-900">Access Restricted</h2>
-                <p className="text-slate-500 text-sm mt-1">Only administrative accounts can access the organization's payroll data.</p>
+                <p className="text-slate-500 text-sm mt-1">Only administrative accounts can access the organization&apos;s payroll data.</p>
             </div>
         );
     }

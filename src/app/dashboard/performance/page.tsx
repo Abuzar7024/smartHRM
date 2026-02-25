@@ -34,7 +34,7 @@ export default function PerformancePage() {
         });
 
         let totalMs = 0;
-        let daysCount = Object.keys(logsByDate).length;
+        const daysCount = Object.keys(logsByDate).length;
 
         Object.values(logsByDate).forEach(dayLogs => {
             let clockInTime: number | null = null;
@@ -95,16 +95,16 @@ export default function PerformancePage() {
 
         const recentHistory = [...empTasks, ...attendance.filter(a => a.empEmail === emp.email)]
             .sort((a, b) => {
-                const tA = 'createdAt' in a ? new Date(a.createdAt).getTime() : new Date((a as any).timestamp).getTime();
-                const tB = 'createdAt' in b ? new Date(b.createdAt).getTime() : new Date((b as any).timestamp).getTime();
+                const tA = 'createdAt' in a ? new Date(a.createdAt as string).getTime() : new Date((a as { timestamp: string }).timestamp).getTime();
+                const tB = 'createdAt' in b ? new Date(b.createdAt as string).getTime() : new Date((b as { timestamp: string }).timestamp).getTime();
                 return tB - tA; // descending
             })
             .slice(0, 5)
             .map(item => {
                 if ('createdAt' in item) {
-                    return { type: "Task", desc: `${item.title}`, date: item.createdAt, display: item.status };
+                    return { type: "Task", desc: `${(item as { title: string }).title}`, date: (item as { createdAt: string }).createdAt, display: (item as { status: string }).status };
                 } else {
-                    return { type: "Attendance", desc: `Punched: ${item.type}`, date: (item as any).timestamp, display: item.type };
+                    return { type: "Attendance", desc: `Punched: ${(item as { type: string }).type}`, date: (item as { timestamp: string }).timestamp, display: (item as { type: string }).type };
                 }
             });
 
@@ -239,7 +239,7 @@ export default function PerformancePage() {
                                                 Strategic Performance Summary — {analysisResult.userName}
                                             </h3>
                                             <p className="text-lg font-semibold text-slate-900 leading-snug italic">
-                                                "{analysisResult.summary}"
+                                                &quot;{analysisResult.summary}&quot;
                                             </p>
                                         </div>
                                     </div>

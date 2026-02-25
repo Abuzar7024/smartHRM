@@ -24,7 +24,7 @@ export async function GET() {
             role: role
         }, { status: 200 });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Session verification error:", error);
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

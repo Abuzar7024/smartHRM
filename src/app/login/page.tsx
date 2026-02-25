@@ -70,8 +70,9 @@ export default function LoginPage() {
             await sendPasswordResetEmail(auth, email);
             setMsg("Password reset email sent. Please check your inbox.");
             setError("");
-        } catch (err: any) {
-            setError(err.message || "Failed to send reset email.");
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to send reset email.";
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -160,8 +161,17 @@ export default function LoginPage() {
             } else {
                 setError("Failed to create secure session. Please try again.");
             }
-        } catch (err: any) {
-            const code = err.code || "";
+        } catch (err) {
+            let message = "Authentication failed.";
+            let code = "";
+
+            if (err && typeof err === 'object' && 'code' in err) {
+                code = String(err.code);
+            }
+            if (err instanceof Error) {
+                message = err.message;
+            }
+
             if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
                 setError("Invalid email or password.");
             } else if (code.includes("email-already-in-use")) {
@@ -169,7 +179,7 @@ export default function LoginPage() {
             } else if (code.includes("weak-password")) {
                 setError("Password must be at least 6 characters.");
             } else {
-                setError(err.message || "Authentication failed.");
+                setError(message);
             }
         } finally {
             setLoading(false);

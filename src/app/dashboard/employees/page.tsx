@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useApp } from "@/context/AppContext";
+import { useApp, Employee } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
@@ -34,8 +34,8 @@ export default function EmployeesPage() {
 
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-    const [selectedEmp, setSelectedEmp] = useState<any>(null);
-    const [detailsEmp, setDetailsEmp] = useState<any>(null);
+    const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+    const [detailsEmp, setDetailsEmp] = useState<Employee | null>(null);
 
     const togglePermission = (perm: string) => {
         if (!selectedEmp) return;
@@ -46,7 +46,7 @@ export default function EmployeesPage() {
 
     const handleSavePermissions = () => {
         if (selectedEmp) {
-            updateEmployeePermissions(selectedEmp.id, selectedEmp.permissions || []);
+            if (selectedEmp.id) updateEmployeePermissions(selectedEmp.id, selectedEmp.permissions || []);
             toast.success("Permissions Updated", { description: `Access tokens updated for ${selectedEmp.name}.` });
             createNotification({
                 title: "Security Clearance Updated",
@@ -69,10 +69,11 @@ export default function EmployeesPage() {
         setDeleteLoading(true);
         try {
             await deleteEmployeeCascade(deletingEmp.id, deletingEmp.email);
-            toast.success("Employee Removed", { description: `${deletingEmp.name} and all their records have been permanently deleted.` });
-            setDeletingEmp(null);
-        } catch {
-            toast.error("Delete Failed", { description: "Could not delete employee. Please try again." });
+            toast.success("Employee Record Purged", { description: "Cascade deletion complete. All related node data has been removed." });
+            setDeletingEmp(null); // Clear the deleting employee after successful deletion
+        } catch (err) {
+            console.error(err);
+            toast.error("Cleanup Failed", { description: "Employee record was removed, but recursive cleanup failed." });
         } finally {
             setDeleteLoading(false);
         }
@@ -138,7 +139,7 @@ export default function EmployeesPage() {
                     targetRole: "employer"
                 });
             }
-        } catch (err: any) {
+        } catch (err) {
             setError("A network error occurred.");
             toast.error("Network Exception", { description: "Please ensure you have a stable connection and the server is running." });
             createNotification({

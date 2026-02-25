@@ -36,11 +36,12 @@ if (!admin.apps.length) {
             }),
         });
         console.log("Firebase Admin Initialized successfully.");
-    } catch (error: any) {
-        console.error('CRITICAL: Firebase Admin initialization failed:', error.message);
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : "Initialization failed";
+        console.error('CRITICAL: Firebase Admin initialization failed:', msg);
     }
 }
 
 // Export with safety
-export const adminAuth = admin.apps.length > 0 ? admin.auth() : null as any;
-export const adminDb = admin.apps.length > 0 ? admin.firestore() : null as any;
+export const adminAuth = (admin.apps.length > 0 ? admin.auth() : null) as admin.auth.Auth;
+export const adminDb = (admin.apps.length > 0 ? admin.firestore() : null) as admin.firestore.Firestore;

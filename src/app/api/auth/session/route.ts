@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true }, { status: 200 });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Session creation error:", error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }

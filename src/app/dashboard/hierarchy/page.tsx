@@ -192,7 +192,7 @@ export default function HierarchyPage() {
                                 <select
                                     className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 flex-shrink-0"
                                     value={editMap[emp.id!] || hierarchy[emp.id!] || "Staff"}
-                                    onChange={e => setEditMap(prev => ({ ...prev, [emp.id!]: e.target.value as any }))}
+                                    onChange={e => setEditMap(prev => ({ ...prev, [emp.id!]: e.target.value as HierarchyLevel }))}
                                 >
                                     {levels.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
