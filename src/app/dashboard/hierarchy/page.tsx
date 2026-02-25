@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, getDocs, updateDoc, doc, writeBatch, setDoc } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
+import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 
 type HierarchyData = {
