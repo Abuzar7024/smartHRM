@@ -9,8 +9,9 @@ export type Leave = { id?: string; empName: string; empEmail: string; type: stri
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
 export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out"; timestamp: string };
 export type Task = { id?: string; title: string; description: string; assigneeId: string; assigneeEmail: string; status: "Pending" | "In Progress" | "Completed"; priority: "Low" | "Medium" | "High"; dueDate: string; createdAt: string };
-export type EmployeeDocument = { id?: string; empEmail: string; title: string; status: "Pending" | "Uploaded"; url?: string };
+export type EmployeeDocument = { id?: string; empEmail: string; title: string; status: "Pending" | "Uploaded" | "Approved" | "Rejected"; url?: string };
 export type NotificationItem = { id?: string; title: string; message: string; timestamp: string; isRead: boolean; targetEmail?: string; targetRole?: "employer" | "employee" };
+export type DocTemplate = { id?: string; title: string; required: boolean };
 export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; teamType: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Hierarchical" | "Matrix"; createdAt: string; };
 export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; };
 
@@ -40,6 +41,12 @@ interface AppContextType {
     documents: EmployeeDocument[];
     requestDocument: (email: string, title: string) => Promise<void>;
     uploadDocument: (id: string, url: string) => Promise<void>;
+    updateDocumentStatus: (id: string, status: "Approved" | "Rejected") => Promise<void>;
+
+    docTemplates: DocTemplate[];
+    addDocTemplate: (title: string, required: boolean) => Promise<void>;
+    updateDocTemplate: (id: string, title: string, required: boolean) => Promise<void>;
+    deleteDocTemplate: (id: string) => Promise<void>;
 
     notifications: NotificationItem[];
     createNotification: (notif: Omit<NotificationItem, "id" | "timestamp" | "isRead">) => Promise<void>;
@@ -48,6 +55,7 @@ interface AppContextType {
     teams: Team[];
     createTeam: (team: Omit<Team, "id" | "createdAt">) => Promise<void>;
     updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
+    deleteTeam: (id: string) => Promise<void>;
 
     chatMessages: ChatMessage[];
     sendMessage: (msg: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
@@ -71,6 +79,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([
+        { id: "def_passport", title: "Passport", required: true },
+        { id: "def_address", title: "Address Proof", required: true },
+        { id: "def_bank", title: "Bank Details", required: false },
+    ]);
 
     useEffect(() => {
         try {
@@ -110,6 +123,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage)));
             }, (error) => console.log("Firebase Chat Error Setup:", error.message));
 
+            const unsubDocTemplates = onSnapshot(collection(db, "doc_templates"), (snapshot) => {
+                if (!snapshot.empty) {
+                    setDocTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DocTemplate)));
+                }
+            }, (error) => console.log("Firebase DocTemplates Error Setup:", error.message));
+
             return () => {
                 unsubEmployees();
                 unsubLeaves();
@@ -120,6 +139,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 unsubNotifications();
                 unsubTeams();
                 unsubChat();
+                unsubDocTemplates();
             };
         } catch (e) {
             console.error("Firebase config missing or invalid.", e);
@@ -288,6 +308,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const updateDocumentStatus = async (id: string, status: "Approved" | "Rejected") => {
+        try {
+            await updateDoc(doc(db, "documents", id), { status });
+        } catch (e) {
+            console.error("Error updating document status:", e);
+        }
+    };
+
     const createNotification = async (notif: Omit<NotificationItem, "id" | "timestamp" | "isRead">) => {
         try {
             await addDoc(collection(db, "notifications"), {
@@ -297,6 +325,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
         } catch (e) {
             console.error("Error creating notification:", e);
+        }
+    };
+
+    const addDocTemplate = async (title: string, required: boolean) => {
+        try {
+            await addDoc(collection(db, "doc_templates"), { title, required });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const updateDocTemplate = async (id: string, title: string, required: boolean) => {
+        if (id.startsWith("def_")) return; // Don't edit default local ones
+        try {
+            await updateDoc(doc(db, "doc_templates", id), { title, required });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const deleteDocTemplate = async (id: string) => {
+        if (id.startsWith("def_")) return;
+        try {
+            await deleteDoc(doc(db, "doc_templates", id));
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -327,6 +381,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const deleteTeam = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, "teams", id));
+        } catch (e) {
+            console.error("Error deleting team:", e);
+        }
+    };
+
     const sendMessage = async (msg: Omit<ChatMessage, "id" | "timestamp">) => {
         try {
             await addDoc(collection(db, "chat_messages"), {
@@ -345,9 +407,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             payroll, processPayroll, requestPayslip,
             attendance, clockIn, clockOut,
             tasks, addTask, updateTaskStatus,
-            documents, requestDocument, uploadDocument,
+            documents, requestDocument, uploadDocument, updateDocumentStatus,
+            docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
             notifications, createNotification, markNotificationRead,
-            teams, createTeam, updateTeam,
+            teams, createTeam, updateTeam, deleteTeam,
             chatMessages, sendMessage
         }}>
             {children}

@@ -21,7 +21,8 @@ import {
     BarChart3,
     BarChart2,
     UsersRound,
-    MessageSquare
+    MessageSquare,
+    Network
 } from "lucide-react";
 import { useState } from "react";
 
@@ -37,6 +38,7 @@ export function Sidebar() {
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
         { name: "Employees", href: "/dashboard/employees", icon: Users },
         { name: "Teams", href: "/dashboard/teams", icon: UsersRound },
+        { name: "Hierarchy", href: "/dashboard/hierarchy", icon: Network },
         { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
