@@ -24,7 +24,7 @@ function useAllUsers() {
 
 export default function ChatPage() {
     const { user } = useAuth();
-    const { employees, chatMessages, sendMessage } = useApp();
+    const { employees, chatMessages, sendMessage, markChatRead, chatReadTimestamps } = useApp();
     const allUsers = useAllUsers();
 
     const [selectedUserEmail, setSelectedUserEmail] = useState("");
@@ -58,11 +58,12 @@ export default function ChatPage() {
             const lastMsg = msgs.sort((a, b) =>
                 new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             )[0];
-            // Unread = messages received from this contact while this chat is NOT selected
+            // Unread = messages FROM this contact that arrived after last-read timestamp
+            const lastRead = chatReadTimestamps[contact.email] || 0;
             const unread = chatMessages.filter(
                 m => m.sender === contact.email &&
                     m.receiver === user?.email &&
-                    selectedUserEmail !== contact.email
+                    new Date(m.timestamp).getTime() > lastRead
             ).length;
             return { ...contact, lastMsg, unread, lastTs: lastMsg ? new Date(lastMsg.timestamp).getTime() : 0 };
         })
@@ -85,9 +86,13 @@ export default function ChatPage() {
         )
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    // Auto-scroll to bottom on new messages
+    // Auto-scroll + mark as read when messages update for the active chat
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        // Mark chat read whenever we view messages from this contact
+        if (selectedUserEmail && user?.email && activeChat.some(m => m.sender === selectedUserEmail)) {
+            markChatRead(user.email, selectedUserEmail);
+        }
     }, [activeChat.length, selectedUserEmail]);
 
     const handleSend = async (e: React.FormEvent) => {
@@ -98,6 +103,12 @@ export default function ChatPage() {
     };
 
     const selectedContact = directory.find(d => d.email === selectedUserEmail);
+
+    // When selecting a contact, immediately mark as read
+    const handleSelectContact = (email: string) => {
+        setSelectedUserEmail(email);
+        if (user?.email) markChatRead(user.email, email);
+    };
 
     return (
         <div className="h-[calc(100vh-4rem)] flex flex-col bg-slate-50">
@@ -132,7 +143,7 @@ export default function ChatPage() {
                             return (
                                 <button
                                     key={contact.email}
-                                    onClick={() => setSelectedUserEmail(contact.email)}
+                                    onClick={() => handleSelectContact(contact.email)}
                                     className={cn(
                                         "w-full text-left px-3 py-3 flex items-center gap-3 transition-all duration-150 border-b border-slate-100",
                                         isSelected

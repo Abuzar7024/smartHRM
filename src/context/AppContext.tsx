@@ -63,6 +63,8 @@ interface AppContextType {
 
     chatMessages: ChatMessage[];
     sendMessage: (msg: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
+    markChatRead: (myEmail: string, contactEmail: string) => Promise<void>;
+    chatReadTimestamps: Record<string, number>; // key: contactEmail, value: ms timestamp
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -84,6 +86,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [teams, setTeams] = useState<Team[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [pendingRegistrations, setPendingRegistrations] = useState<{ uid: string; email: string; companyName?: string }[]>([]);
+    const [chatReadTimestamps, setChatReadTimestamps] = useState<Record<string, number>>({});
     const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([
         { id: "def_passport", title: "Passport", required: true },
         { id: "def_address", title: "Address Proof", required: true },
@@ -147,6 +150,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 (error) => console.log("Firebase Pending Error:", error.message)
             );
 
+            // Load chat read timestamps for this session
+            const unsubChatReads = onSnapshot(collection(db, "chat_reads"), (snapshot) => {
+                const map: Record<string, number> = {};
+                snapshot.docs.forEach(d => {
+                    const data = d.data();
+                    if (data.readAt) map[data.contactEmail] = data.readAt;
+                });
+                setChatReadTimestamps(map);
+            }, (error) => console.log("Firebase ChatReads Error:", error.message));
+
             return () => {
                 unsubEmployees();
                 unsubLeaves();
@@ -159,6 +172,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 unsubChat();
                 unsubDocTemplates();
                 unsubPending();
+                unsubChatReads();
             };
         } catch (e) {
             console.error("Firebase config missing or invalid.", e);
@@ -477,6 +491,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const markChatRead = async (myEmail: string, contactEmail: string) => {
+        try {
+            const key = `${myEmail}__${contactEmail}`;
+            const now = Date.now();
+            await updateDoc(doc(db, "chat_reads", key), { readAt: now }).catch(async () => {
+                // Document doesn't exist yet — create it
+                await addDoc(collection(db, "chat_reads"), { key, myEmail, contactEmail, readAt: now });
+            });
+            setChatReadTimestamps(prev => ({ ...prev, [contactEmail]: now }));
+        } catch (e) {
+            console.error("Error marking chat read:", e);
+        }
+    };
+
     const sendMessage = async (msg: Omit<ChatMessage, "id" | "timestamp">) => {
         try {
             await addDoc(collection(db, "chat_messages"), {
@@ -500,7 +528,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
             notifications, createNotification, markNotificationRead,
             teams, createTeam, updateTeam, deleteTeam,
-            chatMessages, sendMessage
+            chatMessages, sendMessage, markChatRead, chatReadTimestamps
         }}>
             {children}
         </AppContext.Provider>

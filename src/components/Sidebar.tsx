@@ -29,16 +29,20 @@ import { useState } from "react";
 export function Sidebar() {
     const pathname = usePathname();
     const { role, logout, user } = useAuth();
-    const { teams, chatMessages } = useApp();
+    const { teams, chatMessages, chatReadTimestamps } = useApp();
     const [collapsed, setCollapsed] = useState(false);
 
     const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
     const isTeamMember = teams.some(t => (t.memberEmails || []).includes(user?.email || ""));
 
-    // Unread chat count: messages received by this user in any conversation
-    const unreadChats = chatMessages.filter(
-        m => m.receiver === user?.email && pathname !== "/dashboard/chat"
-    ).length;
+    // Unread = messages sent TO me that arrived AFTER I last read that conversation
+    const unreadChats = pathname !== "/dashboard/chat"
+        ? chatMessages.filter(m => {
+            if (m.receiver !== user?.email) return false;
+            const lastRead = chatReadTimestamps[m.sender] || 0;
+            return new Date(m.timestamp).getTime() > lastRead;
+        }).length
+        : 0;
 
     const employerLinks = [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },

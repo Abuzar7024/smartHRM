@@ -83,5 +83,9 @@ service cloud.firestore {
             allow write: if isEmployer();
         }
 
+        match /chat_reads/{docId} {
+            allow read, write: if request.auth != null;
+        }
+
     }
 }
