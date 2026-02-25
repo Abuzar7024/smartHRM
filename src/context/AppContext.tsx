@@ -11,7 +11,7 @@ export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Cl
 export type Task = { id?: string; title: string; description: string; assigneeId: string; assigneeEmail: string; status: "Pending" | "In Progress" | "Completed"; priority: "Low" | "Medium" | "High"; dueDate: string; createdAt: string };
 export type EmployeeDocument = { id?: string; empEmail: string; title: string; status: "Pending" | "Uploaded"; url?: string };
 export type NotificationItem = { id?: string; title: string; message: string; timestamp: string; isRead: boolean; targetEmail?: string; targetRole?: "employer" | "employee" };
-export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; createdAt: string; type: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Top-Down" | "Matrix" };
+export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; teamType: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Hierarchical" | "Matrix"; createdAt: string; };
 export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; };
 
 interface AppContextType {
@@ -47,6 +47,7 @@ interface AppContextType {
 
     teams: Team[];
     createTeam: (team: Omit<Team, "id" | "createdAt">) => Promise<void>;
+    updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
 
     chatMessages: ChatMessage[];
     sendMessage: (msg: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
@@ -318,6 +319,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const updateTeam = async (id: string, updates: Partial<Team>) => {
+        try {
+            await updateDoc(doc(db, "teams", id), updates);
+        } catch (e) {
+            console.error("Error updating team:", e);
+        }
+    };
+
     const sendMessage = async (msg: Omit<ChatMessage, "id" | "timestamp">) => {
         try {
             await addDoc(collection(db, "chat_messages"), {
@@ -338,7 +347,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             tasks, addTask, updateTaskStatus,
             documents, requestDocument, uploadDocument,
             notifications, createNotification, markNotificationRead,
-            teams, createTeam,
+            teams, createTeam, updateTeam,
             chatMessages, sendMessage
         }}>
             {children}
