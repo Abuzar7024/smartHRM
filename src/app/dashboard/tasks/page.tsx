@@ -17,13 +17,32 @@ import { cn } from "@/lib/utils";
 
 export default function TasksPage() {
     const { role, user } = useAuth();
-    const { tasks, employees, addTask, updateTaskStatus } = useApp();
+    const { tasks, employees, teams, addTask, updateTaskStatus } = useApp();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [isAddOpen, setIsAddOpen] = useState(false);
 
     const myEmp = employees.find((emp: Employee) => emp.email === user?.email);
-    const canAssignTasks = role === "employer" || (myEmp?.permissions || []).includes("assign_tasks");
+    const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
+    const canAssignTasks = role === "employer" || isTeamLeader || (myEmp?.permissions || []).includes("assign_tasks");
+
+    // Team leader can only assign tasks to their own team members
+    const myLedTeam = teams.find(t => t.leaderEmail === user?.email);
+    const assignableEmployees = role === "employer"
+        ? employees
+        : myLedTeam
+            ? employees.filter(e => (myLedTeam.memberEmails || []).includes(e.email))
+            : [];
+
+    // Employers see all tasks; team leaders see tasks for their team; employees see only their own
+    const visibleTasks = role === "employer"
+        ? tasks
+        : isTeamLeader && myLedTeam
+            ? tasks.filter(t =>
+                t.assigneeEmail === user?.email ||
+                (myLedTeam.memberEmails || []).includes(t.assigneeEmail)
+            )
+            : tasks.filter(t => t.assigneeEmail === user?.email);
 
     // New task form state
     const [newTask, setNewTask] = useState({
@@ -53,12 +72,11 @@ export default function TasksPage() {
         setNewTask({ title: "", description: "", assigneeId: "", priority: "Medium", dueDate: "" });
     };
 
-    const filteredTasks = tasks.filter((task: Task) => {
+    const filteredTasks = visibleTasks.filter((task: Task) => {
         const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase()) ||
             task.assigneeEmail.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-        const matchesRole = role === "employer" || task.assigneeEmail === user?.email;
-        return matchesSearch && matchesStatus && matchesRole;
+        return matchesSearch && matchesStatus;
     });
 
     const getStatusVariant = (status: string) => {
@@ -124,7 +142,7 @@ export default function TasksPage() {
                                                 required
                                             >
                                                 <option value="">Select employee</option>
-                                                {employees.map((emp) => (
+                                                {assignableEmployees.map((emp) => (
                                                     <option key={emp.id} value={emp.id}>{emp.name}</option>
                                                 ))}
                                             </select>
@@ -134,7 +152,7 @@ export default function TasksPage() {
                                             <select
                                                 className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                                                 value={newTask.priority}
-                                                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
+                                                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as "Low" | "Medium" | "High" })}
                                             >
                                                 <option value="Low">Low</option>
                                                 <option value="Medium">Medium</option>

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
 const Sidebar = dynamic(() => import("@/components/Sidebar").then(mod => mod.Sidebar), {
     ssr: false,
     loading: () => <div className="w-64 bg-slate-900 animate-pulse h-screen hidden lg:block" />
 });
-import { Loader2, Bell, CalendarDays, Menu, X, Info } from "lucide-react";
+import { Loader2, Bell, CalendarDays, Menu, X, Info, Hourglass, Building2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils"; // Assuming this path for cn utility
@@ -19,9 +19,10 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const { user, loading, role } = useAuth();
+    const { user, loading, role, status, companyName, logout } = useAuth();
     const { leaves, notifications, markNotificationRead } = useApp();
     const router = useRouter();
+    const pathname = usePathname();
     const [isClient, setIsClient] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -42,6 +43,19 @@ export default function DashboardLayout({
     );
 
     const unreadCount = myNotifications.filter(n => !n.isRead).length;
+
+    // Map notification title keywords → dashboard routes
+    const getNotifRoute = (title: string, message: string): string => {
+        const t = (title + " " + message).toLowerCase();
+        if (t.includes("document") || t.includes("upload") || t.includes("file")) return "/dashboard/profile";
+        if (t.includes("leave") || t.includes("time off")) return "/dashboard/leaves";
+        if (t.includes("task") || t.includes("assigned")) return "/dashboard/tasks";
+        if (t.includes("chat") || t.includes("message")) return "/dashboard/chat";
+        if (t.includes("payroll") || t.includes("payslip") || t.includes("salary")) return "/dashboard/payroll";
+        if (t.includes("registration") || t.includes("approved") || t.includes("welcome")) return "/dashboard";
+        if (t.includes("attendance") || t.includes("clock")) return "/dashboard";
+        return "/dashboard";
+    };
 
     // Trigger toast for new notifications
     useEffect(() => {
@@ -66,6 +80,66 @@ export default function DashboardLayout({
     }
 
     if (!user) return null;
+
+    // ─────────────────────────────────────────────────────────
+    // WAITING SCREEN (For Pending Employees)
+    // ─────────────────────────────────────────────────────────
+    if (status === "pending") {
+        return (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+                <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8 text-center relative z-10"
+                >
+                    <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                            className="absolute inset-0 border-2 border-dashed border-indigo-200 rounded-full"
+                        />
+                        <Hourglass className="w-10 h-10 text-indigo-600 animate-pulse" />
+                    </div>
+
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Pending</h1>
+                    <p className="text-slate-500 mb-8 leading-relaxed">
+                        Your account has been created successfully, but requires approval from your organization's administrator before you can access the dashboard.
+                    </p>
+
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-8 text-left flex items-start gap-4">
+                        <Building2 className="w-6 h-6 text-slate-400 mt-1 flex-shrink-0" />
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Requested Organization</p>
+                            <p className="text-sm font-semibold text-slate-800">{companyName || "Unknown Company"}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <button
+                            className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition-all shadow-md shadow-slate-900/10 flex items-center justify-center cursor-not-allowed opacity-80"
+                            disabled
+                        >
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Waiting for Approval...
+                        </button>
+                        <button
+                            onClick={logout}
+                            className="w-full h-12 rounded-xl bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors"
+                        >
+                            Sign Out
+                        </button>
+                    </div>
+                </motion.div>
+
+                {/* Background decorative elements */}
+                <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute top-1/4 -right-32 w-80 h-80 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
+            </div>
+        );
+    }
 
     return (
         <div className="flex bg-slate-50 h-screen w-full relative overflow-hidden">
@@ -120,7 +194,10 @@ export default function DashboardLayout({
                                         myNotifications.slice(0, 10).map(notif => (
                                             <div
                                                 key={notif.id}
-                                                onClick={() => !notif.isRead && markNotificationRead(notif.id!)}
+                                                onClick={() => {
+                                                    if (!notif.isRead) markNotificationRead(notif.id!);
+                                                    router.push(getNotifRoute(notif.title, notif.message));
+                                                }}
                                                 className={cn(
                                                     "p-3 rounded-lg flex items-start gap-3 transition-colors cursor-pointer",
                                                     notif.isRead ? "bg-slate-50 opacity-70" : "bg-primary/5 hover:bg-primary/10"

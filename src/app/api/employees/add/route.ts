@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
     try {
-        const { name, email, password, role, department } = await request.json();
+        const { name, email, password, role, department, position } = await request.json();
 
         // 1. Verify that the current user is an Employer
         const cookieStore = await cookies();
@@ -17,9 +17,12 @@ export async function POST(request: Request) {
         const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
         const employerDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
 
-        if (!employerDoc.exists || employerDoc.data()?.role !== 'employer') {
+        const employerData = employerDoc.data();
+        if (!employerDoc.exists || employerData?.role !== 'employer') {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
         }
+
+        const companyName = employerData?.companyName;
 
         // 2. Create user in Firebase Auth
         const userCredential = await adminAuth.createUser({
@@ -32,6 +35,7 @@ export async function POST(request: Request) {
         await adminDb.collection('users').doc(userCredential.uid).set({
             email,
             role: 'employee',
+            companyName: companyName,
             status: 'pending', // Key for invitation flow
             createdAt: new Date(),
         });
@@ -42,18 +46,20 @@ export async function POST(request: Request) {
             name,
             email,
             role: role || 'Staff',
+            position: position || 'Staff',
             department: department || 'General',
+            companyName: companyName,
             status: 'Invited', // Display status
             joinedAt: new Date(),
+            leaveBalance: 12,
+            permissions: []
         });
 
         return NextResponse.json({ success: true, uid: userCredential.uid }, { status: 200 });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Error creating employee account:", error);
-        return NextResponse.json({
-            error: error.message || 'Internal server error',
-            code: error.code
-        }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

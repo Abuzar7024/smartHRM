@@ -31,10 +31,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true }, { status: 200 });
 
-    } catch (error: any) {
-        console.error("Error accepting invitation:", error);
-        return NextResponse.json({
-            error: error.message || 'Internal server error'
-        }, { status: 500 });
+    } catch (error) {
+        console.error("Invitation acceptance error:", error);
+        return NextResponse.json({ error: 'Failed to process invitation' }, { status: 500 });
     }
 }

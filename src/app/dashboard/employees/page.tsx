@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useApp } from "@/context/AppContext";
+import { useApp, Employee } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Search, Plus, MoreHorizontal, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar } from "lucide-react";
+import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
@@ -17,14 +17,17 @@ import { toast } from "sonner";
 
 export default function EmployeesPage() {
     const { role } = useAuth();
-    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification } = useApp();
+    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
     const [showForm, setShowForm] = useState(false);
+    const [deletingEmp, setDeletingEmp] = useState<{ id: string; name: string; email: string } | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     // Form State
     const [empName, setEmpName] = useState("");
     const [empEmail, setEmpEmail] = useState("");
     const [empRole, setEmpRole] = useState("");
+    const [empPosition, setEmpPosition] = useState("");
     const [empDept, setEmpDept] = useState("");
     const [empPassword, setEmpPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -32,8 +35,8 @@ export default function EmployeesPage() {
 
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-    const [selectedEmp, setSelectedEmp] = useState<any>(null);
-    const [detailsEmp, setDetailsEmp] = useState<any>(null);
+    const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+    const [detailsEmp, setDetailsEmp] = useState<Employee | null>(null);
 
     const togglePermission = (perm: string) => {
         if (!selectedEmp) return;
@@ -44,7 +47,7 @@ export default function EmployeesPage() {
 
     const handleSavePermissions = () => {
         if (selectedEmp) {
-            updateEmployeePermissions(selectedEmp.id, selectedEmp.permissions || []);
+            if (selectedEmp.id) updateEmployeePermissions(selectedEmp.id, selectedEmp.permissions || []);
             toast.success("Permissions Updated", { description: `Access tokens updated for ${selectedEmp.name}.` });
             createNotification({
                 title: "Security Clearance Updated",
@@ -59,6 +62,21 @@ export default function EmployeesPage() {
             });
             setPermissionsModalOpen(false);
             setSelectedEmp(null);
+        }
+    };
+
+    const handleDeleteEmployee = async () => {
+        if (!deletingEmp) return;
+        setDeleteLoading(true);
+        try {
+            await deleteEmployeeCascade(deletingEmp.id, deletingEmp.email);
+            toast.success("Employee Record Purged", { description: "Cascade deletion complete. All related node data has been removed." });
+            setDeletingEmp(null); // Clear the deleting employee after successful deletion
+        } catch (err) {
+            console.error(err);
+            toast.error("Cleanup Failed", { description: "Employee record was removed, but recursive cleanup failed." });
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -95,6 +113,7 @@ export default function EmployeesPage() {
                     email: empEmail,
                     password: empPassword,
                     role: empRole || "Staff",
+                    position: empPosition || "Staff",
                     department: empDept || "General"
                 }),
             });
@@ -111,6 +130,7 @@ export default function EmployeesPage() {
                 setEmpEmail("");
                 setEmpPassword("");
                 setEmpRole("");
+                setEmpPosition("");
                 setEmpDept("");
             } else {
                 const data = await response.json();
@@ -122,7 +142,7 @@ export default function EmployeesPage() {
                     targetRole: "employer"
                 });
             }
-        } catch (err: any) {
+        } catch (err) {
             setError("A network error occurred.");
             toast.error("Network Exception", { description: "Please ensure you have a stable connection and the server is running." });
             createNotification({
@@ -133,6 +153,7 @@ export default function EmployeesPage() {
         } finally {
             setLoading(false);
         }
+
     };
 
     return (
@@ -198,6 +219,10 @@ export default function EmployeesPage() {
                                             <option value="Intern">Intern</option>
                                         </select>
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Position</Label>
+                                        <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Frontend Developer" className="rounded-lg" />
+                                    </div>
                                     <div className="space-y-1.5 lg:col-span-2">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
                                         <select
@@ -258,7 +283,7 @@ export default function EmployeesPage() {
                         <TableHeader>
                             <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
                                 <TableHead className="h-10">Name & Contact</TableHead>
-                                <TableHead className="h-10">Role</TableHead>
+                                <TableHead className="h-10">Role & Position</TableHead>
                                 <TableHead className="h-10">Department</TableHead>
                                 <TableHead className="h-10">DOJ / Status</TableHead>
                                 <TableHead className="h-10 text-right">Permissions & Actions</TableHead>
@@ -280,7 +305,10 @@ export default function EmployeesPage() {
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="py-4 text-sm font-medium text-slate-700">{emp.role}</TableCell>
+                                    <TableCell className="py-4 text-sm text-slate-700">
+                                        <div className="font-medium">{emp.role}</div>
+                                        {emp.position && <div className="text-xs text-slate-500 mt-0.5">{emp.position}</div>}
+                                    </TableCell>
                                     <TableCell className="py-4 text-sm text-slate-500">{emp.department}</TableCell>
                                     <TableCell className="py-4">
                                         <div className="flex flex-col items-start gap-1">
@@ -311,13 +339,10 @@ export default function EmployeesPage() {
                                         <Button
                                             variant="ghost"
                                             size="icon-sm"
-                                            className="text-slate-400 rounded-lg hover:text-primary"
-                                            onClick={() => {
-                                                setDetailsEmp(emp);
-                                                setDetailsModalOpen(true);
-                                            }}
+                                            className="text-slate-400 rounded-lg hover:text-rose-600 hover:bg-rose-50"
+                                            onClick={() => setDeletingEmp({ id: emp.id!, name: emp.name, email: emp.email })}
                                         >
-                                            <MoreHorizontal className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -336,6 +361,79 @@ export default function EmployeesPage() {
                     </Table>
                 </div>
             </Card>
+
+            {/* ── Pending Registrations ── */}
+            {pendingRegistrations.length > 0 && (
+                <Card className="border-amber-200 bg-amber-50 shadow-none">
+                    <CardHeader className="pb-2 pt-4 px-5">
+                        <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            Pending Employee Registration Requests ({pendingRegistrations.length})
+                        </CardTitle>
+                        <CardDescription className="text-amber-700 text-xs">These users registered and are awaiting your approval to join your organization.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-4 space-y-2">
+                        {pendingRegistrations.map(reg => {
+                            const matchedEmp = employees.find(e => e.email === reg.email);
+                            return (
+                                <div key={reg.uid} className="flex items-center justify-between bg-white border border-amber-200 rounded-lg p-3 gap-3">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">{reg.email}</p>
+                                        {reg.companyName && <p className="text-xs text-slate-500">Company: {reg.companyName}</p>}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {matchedEmp ? (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    onClick={() => { approveRegistration(reg.uid, matchedEmp.id!); toast.success("Approved!", { description: `${reg.email} can now log in.` }); }}
+                                                >
+                                                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 border-rose-200 text-rose-600 hover:bg-rose-50"
+                                                    onClick={() => { rejectRegistration(reg.uid); toast.error("Rejected", { description: `${reg.email} has been denied access.` }); }}
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <p className="text-xs text-amber-600 italic">Add this email as an employee first to approve</p>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* ── Delete Confirm Dialog ── */}
+            <Dialog open={!!deletingEmp} onOpenChange={(v) => { if (!v) setDeletingEmp(null); }}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-rose-600">
+                            <Trash2 className="w-5 h-5" /> Delete Employee
+                        </DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete <strong>{deletingEmp?.name}</strong> and ALL their associated data including tasks, documents, leaves, payroll records, and chat messages. This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 mt-4">
+                        <Button variant="ghost" onClick={() => setDeletingEmp(null)} disabled={deleteLoading}>Cancel</Button>
+                        <Button
+                            className="bg-rose-600 hover:bg-rose-700 text-white"
+                            onClick={handleDeleteEmployee}
+                            disabled={deleteLoading}
+                        >
+                            {deleteLoading ? "Deleting..." : "Yes, Delete Permanently"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* ── Permissions Modal ── */}
             <Dialog open={permissionsModalOpen} onOpenChange={setPermissionsModalOpen}>

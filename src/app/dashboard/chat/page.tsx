@@ -24,7 +24,7 @@ function useAllUsers() {
 
 export default function ChatPage() {
     const { user } = useAuth();
-    const { employees, chatMessages, sendMessage } = useApp();
+    const { employees, chatMessages, sendMessage, markChatRead, chatReadTimestamps } = useApp();
     const allUsers = useAllUsers();
 
     const [selectedUserEmail, setSelectedUserEmail] = useState("");
@@ -49,10 +49,34 @@ export default function ChatPage() {
         }
     });
 
-    const filteredDirectory = directory.filter(d =>
-        d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.email.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredDirectory = directory
+        .map(contact => {
+            const msgs = chatMessages.filter(m =>
+                (m.sender === user?.email && m.receiver === contact.email) ||
+                (m.receiver === user?.email && m.sender === contact.email)
+            );
+            const lastMsg = msgs.sort((a, b) =>
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            )[0];
+            // Unread = messages FROM this contact that arrived after last-read timestamp
+            const lastRead = chatReadTimestamps[contact.email] || 0;
+            const unread = chatMessages.filter(
+                m => m.sender === contact.email &&
+                    m.receiver === user?.email &&
+                    new Date(m.timestamp).getTime() > lastRead
+            ).length;
+            return { ...contact, lastMsg, unread, lastTs: lastMsg ? new Date(lastMsg.timestamp).getTime() : 0 };
+        })
+        // Sort: unread first, then by most-recent message, then alphabetically
+        .sort((a, b) => {
+            if (b.unread !== a.unread) return b.unread - a.unread;
+            if (b.lastTs !== a.lastTs) return b.lastTs - a.lastTs;
+            return a.name.localeCompare(b.name);
+        })
+        .filter(d =>
+            d.name.toLowerCase().includes(search.toLowerCase()) ||
+            d.email.toLowerCase().includes(search.toLowerCase())
+        );
 
     // ── Real-time chat: already via onSnapshot in AppContext ──
     const activeChat = chatMessages
@@ -62,9 +86,13 @@ export default function ChatPage() {
         )
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    // Auto-scroll to bottom on new messages
+    // Auto-scroll + mark as read when messages update for the active chat
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        // Mark chat read whenever we view messages from this contact
+        if (selectedUserEmail && user?.email && activeChat.some(m => m.sender === selectedUserEmail)) {
+            markChatRead(user.email, selectedUserEmail);
+        }
     }, [activeChat.length, selectedUserEmail]);
 
     const handleSend = async (e: React.FormEvent) => {
@@ -74,11 +102,13 @@ export default function ChatPage() {
         setNewMessage("");
     };
 
-    // Unread count per contact
-    const unreadCount = (email: string) =>
-        chatMessages.filter(m => m.sender === email && m.receiver === user?.email).length;
-
     const selectedContact = directory.find(d => d.email === selectedUserEmail);
+
+    // When selecting a contact, immediately mark as read
+    const handleSelectContact = (email: string) => {
+        setSelectedUserEmail(email);
+        if (user?.email) markChatRead(user.email, email);
+    };
 
     return (
         <div className="h-[calc(100vh-4rem)] flex flex-col bg-slate-50">
@@ -108,44 +138,60 @@ export default function ChatPage() {
                             <div className="p-6 text-center text-slate-400 text-sm">No contacts found.</div>
                         )}
                         {filteredDirectory.map(contact => {
-                            const lastMsg = chatMessages
-                                .filter(m =>
-                                    (m.sender === user?.email && m.receiver === contact.email) ||
-                                    (m.receiver === user?.email && m.sender === contact.email)
-                                )
-                                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-
+                            const hasUnread = contact.unread > 0;
+                            const isSelected = selectedUserEmail === contact.email;
                             return (
                                 <button
                                     key={contact.email}
-                                    onClick={() => setSelectedUserEmail(contact.email)}
+                                    onClick={() => handleSelectContact(contact.email)}
                                     className={cn(
-                                        "w-full text-left px-3 py-3 flex items-center gap-3 transition-colors border-b border-slate-50 hover:bg-slate-50",
-                                        selectedUserEmail === contact.email
+                                        "w-full text-left px-3 py-3 flex items-center gap-3 transition-all duration-150 border-b border-slate-100",
+                                        isSelected
                                             ? "bg-indigo-50 border-l-[3px] border-l-indigo-600"
-                                            : "border-l-[3px] border-l-transparent"
+                                            : hasUnread
+                                                ? "bg-blue-50/70 border-l-[3px] border-l-blue-500 hover:bg-blue-50"
+                                                : "border-l-[3px] border-l-transparent hover:bg-slate-50"
                                     )}
                                 >
-                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-600 to-indigo-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                                        {contact.name.charAt(0).toUpperCase()}
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-600 to-indigo-700 text-white flex items-center justify-center font-bold text-sm">
+                                            {contact.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        {hasUnread && !isSelected && (
+                                            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
+                                                {contact.unread > 9 ? "9+" : contact.unread}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-sm font-semibold text-slate-900 truncate">{contact.name}</p>
-                                            {lastMsg && (
-                                                <span className="text-[10px] text-slate-400 flex-shrink-0 ml-1">
-                                                    {new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            <p className={cn(
+                                                "text-sm truncate",
+                                                hasUnread && !isSelected ? "font-bold text-slate-900" : "font-semibold text-slate-800"
+                                            )}>
+                                                {contact.name}
+                                            </p>
+                                            {contact.lastMsg && (
+                                                <span className={cn(
+                                                    "text-[10px] flex-shrink-0 ml-1",
+                                                    hasUnread && !isSelected ? "text-blue-500 font-semibold" : "text-slate-400"
+                                                )}>
+                                                    {new Date(contact.lastMsg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[11px] text-slate-400 truncate capitalize">{contact.role}</p>
+                                        <div className="flex items-center justify-between gap-1 mt-0.5">
+                                            {contact.lastMsg ? (
+                                                <p className={cn(
+                                                    "text-[11px] truncate flex-1",
+                                                    hasUnread && !isSelected ? "text-slate-700 font-medium" : "text-slate-400"
+                                                )}>
+                                                    {contact.lastMsg.sender === user?.email ? "You: " : ""}{contact.lastMsg.text}
+                                                </p>
+                                            ) : (
+                                                <p className="text-[11px] text-slate-400 truncate capitalize">{contact.role}</p>
+                                            )}
                                         </div>
-                                        {lastMsg && (
-                                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                                {lastMsg.sender === user?.email ? "You: " : ""}{lastMsg.text}
-                                            </p>
-                                        )}
                                     </div>
                                 </button>
                             );

@@ -29,17 +29,27 @@ import { useState } from "react";
 export function Sidebar() {
     const pathname = usePathname();
     const { role, logout, user } = useAuth();
-    const { teams } = useApp();
+    const { teams, chatMessages, chatReadTimestamps } = useApp();
     const [collapsed, setCollapsed] = useState(false);
 
     const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
+    const isTeamMember = teams.some(t => (t.memberEmails || []).includes(user?.email || ""));
+
+    // Unread = messages sent TO me that arrived AFTER I last read that conversation
+    const unreadChats = pathname !== "/dashboard/chat"
+        ? chatMessages.filter(m => {
+            if (m.receiver !== user?.email) return false;
+            const lastRead = chatReadTimestamps[m.sender] || 0;
+            return new Date(m.timestamp).getTime() > lastRead;
+        }).length
+        : 0;
 
     const employerLinks = [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
         { name: "Employees", href: "/dashboard/employees", icon: Users },
         { name: "Teams", href: "/dashboard/teams", icon: UsersRound },
         { name: "Hierarchy", href: "/dashboard/hierarchy", icon: Network },
-        { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
+        { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, badge: unreadChats },
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
@@ -49,8 +59,9 @@ export function Sidebar() {
 
     const employeeLinks = [
         { name: "My Dashboard", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
-        ...(isTeamLeader ? [{ name: "My Teams", href: "/dashboard/teams", icon: UsersRound }] : []),
+        { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, badge: unreadChats },
+        // All team members + leaders can see Teams
+        ...((isTeamLeader || isTeamMember) ? [{ name: "Teams", href: "/dashboard/teams", icon: UsersRound, badge: 0 }] : []),
         { name: "My Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "My Profile", href: "/dashboard/profile", icon: User },
         { name: "My Payslips", href: "/dashboard/payslips", icon: CreditCard },
@@ -108,20 +119,38 @@ export function Sidebar() {
                 <nav className={cn("p-3 space-y-0.5 mt-2", collapsed && "mt-4")}>
                     {navLinks.map((link) => {
                         const isActive = pathname === link.href;
+                        const badgeCount = link.badge ?? 0;
                         return (
                             <Link key={link.href} href={link.href}>
                                 <span
                                     className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 transition-colors duration-150 group",
+                                        "flex items-center gap-3 rounded-md px-3 py-2 transition-colors duration-150 group relative",
                                         isActive
                                             ? "bg-slate-800 text-white font-medium"
                                             : "text-slate-400 hover:text-white hover:bg-slate-800/50",
                                         collapsed ? "justify-center" : ""
                                     )}
                                 >
-                                    <link.icon className={cn("w-[18px] h-[18px] flex-shrink-0 transition-transform", isActive ? "text-white" : "group-hover:scale-110")} />
+                                    {/* Icon with badge dot when collapsed */}
+                                    <div className="relative flex-shrink-0">
+                                        <link.icon className={cn("w-[18px] h-[18px] transition-transform", isActive ? "text-white" : "group-hover:scale-110")} />
+                                        {collapsed && badgeCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border border-[#0f172a] text-[8px] text-white font-bold flex items-center justify-center">
+                                                {badgeCount > 9 ? "9" : badgeCount}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Label + badge when expanded */}
                                     {!collapsed && (
-                                        <span className="text-sm">{link.name}</span>
+                                        <>
+                                            <span className="text-sm flex-1">{link.name}</span>
+                                            {badgeCount > 0 && !isActive && (
+                                                <span className="ml-auto min-w-[20px] h-5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+                                                    {badgeCount > 99 ? "99+" : badgeCount}
+                                                </span>
+                                            )}
+                                        </>
                                     )}
                                 </span>
                             </Link>

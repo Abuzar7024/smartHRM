@@ -10,9 +10,11 @@ service cloud.firestore {
 
         // Users Collection
         match /users/{userId} {
-            // Users can read and create their own document
-            allow read, create: if request.auth != null && request.auth.uid == userId;
-            // Employers and the user themselves can update their document (except role for non-admins)
+            // Any authenticated user can read profiles (needed for chat directory)
+            allow read: if request.auth != null;
+            // Users can create their own document on registration
+            allow create: if request.auth != null && request.auth.uid == userId;
+            // Employers and the user themselves can update their document
             allow update: if request.auth != null && (request.auth.uid == userId || isEmployer());
             // Only employers can delete
             allow delete: if isEmployer(); 
@@ -20,8 +22,10 @@ service cloud.firestore {
 
         // Employees Collection
         match /employees/{docId} {
-            allow read: if request.auth != null; 
-            allow write: if isEmployer();       
+            // Allow unauthenticated reads so the registration page can verify
+            // the employee exists before creating an account
+            allow read: if true;
+            allow write: if isEmployer();
         }
 
         // Leaves Collection
@@ -74,6 +78,21 @@ service cloud.firestore {
 
         match /chat_messages/{msgId} {
             allow read, write: if request.auth != null;
+        }
+
+        match /hierarchy/{docId} {
+            allow read: if request.auth != null;
+            allow write: if isEmployer();
+        }
+
+        match /chat_reads/{docId} {
+            allow read, write: if request.auth != null;
+        }
+
+        // Companies — publicly readable so employees can search during registration
+        match /companies/{docId} {
+            allow read: if true;
+            allow write: if isEmployer();
         }
 
     }
