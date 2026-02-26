@@ -64,7 +64,7 @@ export default function PerformancePage() {
         // Simulate AI processing delay
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        const empTasks = tasks.filter(t => t.assigneeId === emp.id || t.assigneeEmail === emp.email);
+        const empTasks = tasks.filter(t => t.assigneeEmails?.includes(emp.email));
         const completedTasks = empTasks.filter(t => t.status === "Completed").length;
         const totalTasks = empTasks.length;
         const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;

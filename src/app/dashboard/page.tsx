@@ -12,16 +12,18 @@ import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/Dialog";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function DashboardOverview() {
     const [accepting, setAccepting] = useState(false);
     const { role, user, status } = useAuth();
-    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, sendDocumentReminder, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
+    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
 
     const [docTitle, setDocTitle] = useState("");
     const [docRequired, setDocRequired] = useState(false);
     const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
-    const [docType, setDocType] = useState("");
+    const [selectedDocTitles, setSelectedDocTitles] = useState<string[]>([]);
     const [docEmpEmail, setDocEmpEmail] = useState("");
 
     const handleAcceptInvitation = async () => {
@@ -38,6 +40,42 @@ export default function DashboardOverview() {
 
     const pendingOnboardingCount = employees.filter(e => e.status === "Invited" || e.status === "pending").length;
     const approvedDocsCount = documents.filter(d => d.status === "Approved").length;
+    const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingDocId(docId);
+        const storageRef = ref(storage, `documents/${docId}/${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        toast.promise(
+            new Promise((resolve, reject) => {
+                uploadTask.on(
+                    "state_changed",
+                    null,
+                    (error) => reject(error),
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        await uploadDocument(docId, downloadURL);
+                        resolve(downloadURL);
+                    }
+                );
+            }),
+            {
+                loading: 'Uploading document securely to cloud...',
+                success: () => {
+                    setUploadingDocId(null);
+                    return 'File securely transmitted.';
+                },
+                error: () => {
+                    setUploadingDocId(null);
+                    return 'Failed to upload document.';
+                }
+            }
+        );
+    };
     const rejectedDocsCount = documents.filter(d => d.status === "Rejected").length;
 
     const employerStats = [
@@ -47,7 +85,7 @@ export default function DashboardOverview() {
         { title: "Rejected Documents", value: rejectedDocsCount.toString(), icon: XCircle, color: "text-rose-600", bg: "bg-rose-50" },
     ];
 
-    const myTasks = tasks.filter(t => t.assigneeEmail === user?.email);
+    const myTasks = tasks.filter(t => t.assigneeEmails?.includes(user?.email || ""));
     const myPendingTasks = myTasks.filter(t => t.status !== "Completed");
 
     const employeeStats = [
@@ -187,7 +225,7 @@ export default function DashboardOverview() {
                                 ))}
                             </ul>
                         </div>
-                        <a href="/dashboard/profile" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">
+                        <a href="#onboarding-docs" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">
                             Upload Now →
                         </a>
                     </div>
@@ -469,7 +507,7 @@ export default function DashboardOverview() {
                     </Card>
 
                     <Card className="shadow-sm">
-                        <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+                        <CardHeader id="onboarding-docs" className="p-5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
                             <CardTitle className="text-base font-semibold">Onboarding Documents</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
@@ -507,7 +545,7 @@ export default function DashboardOverview() {
                                                     </div>
                                                     <div className="space-y-2 pt-2 border-t">
                                                         <Label className="text-xs font-bold">Add Document Type</Label>
-                                                        <Input placeholder="e.g. W2 Tax Form" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
+                                                        <Input placeholder="e.g. 2024 W2 Tax Form" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
                                                         <div className="flex items-center gap-2 mt-2">
                                                             <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-primary" />
                                                             <Label htmlFor="reqDoc" className="text-xs">Is this document mandatory?</Label>
@@ -539,32 +577,49 @@ export default function DashboardOverview() {
                                         <option value="">Select Employee File</option>
                                         {employees.map(e => <option key={e.id} value={e.email}>{e.name} ({e.email})</option>)}
                                     </select>
-                                    <select
-                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
-                                        value={docType}
-                                        onChange={e => setDocType(e.target.value)}
-                                    >
-                                        <option value="">Select Required Document Form</option>
-                                        {docTemplates.map(d => <option key={d.id} value={d.title}>{d.title}{d.required ? " *" : ""}</option>)}
-                                    </select>
+                                    <div className="space-y-2 max-h-[160px] overflow-y-auto p-2 border border-slate-100 rounded-md bg-white">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Select Documents to Request:</p>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {docTemplates.map(d => (
+                                                <label key={d.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                        checked={selectedDocTitles.includes(d.title)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedDocTitles([...selectedDocTitles, d.title]);
+                                                            } else {
+                                                                setSelectedDocTitles(selectedDocTitles.filter(t => t !== d.title));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-xs font-medium text-slate-700">
+                                                        {d.title} {d.required && <span className="text-rose-500">*</span>}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
                                     <Button
                                         size="sm"
                                         className="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold"
+                                        disabled={!docEmpEmail || selectedDocTitles.length === 0}
                                         onClick={async () => {
-                                            if (docEmpEmail && docType) {
+                                            if (docEmpEmail && selectedDocTitles.length > 0) {
                                                 try {
-                                                    await requestDocument(docEmpEmail, docType);
-                                                    toast.success("Request Executed", { description: "Employee will be formally notified." });
-                                                    setDocType("");
+                                                    await requestMultipleDocuments(docEmpEmail, selectedDocTitles);
+                                                    toast.success("Request Executed", { description: `${selectedDocTitles.length} documents requested formally.` });
+                                                    setSelectedDocTitles([]);
                                                 } catch {
-                                                    toast.error("Transmission Error", { description: "Unable to request document at this time." });
+                                                    toast.error("Transmission Error", { description: "Unable to request documents at this time." });
                                                 }
                                             } else {
-                                                toast.error("Form Incomplete", { description: "Please select an employee and document template." });
+                                                toast.error("Form Incomplete", { description: "Please select an employee and at least one document template." });
                                             }
                                         }}
                                     >
-                                        Issue Request
+                                        Issue Request ({selectedDocTitles.length})
                                     </Button>
                                 </div>
                             )}
@@ -582,17 +637,24 @@ export default function DashboardOverview() {
                                             </Badge>
                                         </div>
                                         {role === "employee" && (doc.status === "Pending" || doc.status === "Rejected") && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-xs w-full mt-2 h-7 rounded"
-                                                onClick={() => {
-                                                    uploadDocument(doc.id!, "https://example.com/uploaded");
-                                                    toast.success("File Uploaded", { description: `Securely transmitted ${doc.title}.` });
-                                                }}
-                                            >
-                                                Upload Now
-                                            </Button>
+                                            <div className="relative w-full mt-2 h-7 group">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full h-full text-xs rounded pointer-events-none"
+                                                    disabled={uploadingDocId === doc.id}
+                                                >
+                                                    {uploadingDocId === doc.id ? "Uploading..." : "Upload Now"}
+                                                </Button>
+                                                {!uploadingDocId && (
+                                                    <input
+                                                        type="file"
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                        onChange={(e) => handleFileUpload(e, doc.id!)}
+                                                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                                    />
+                                                )}
+                                            </div>
                                         )}
                                         {role === "employer" && doc.status === "Uploaded" && (
                                             <div className="flex items-center gap-2 mt-2 w-full">

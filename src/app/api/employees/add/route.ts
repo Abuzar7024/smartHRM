@@ -24,6 +24,31 @@ export async function POST(request: Request) {
 
         const companyName = employerData?.companyName;
 
+        // Verify Subscription Limit
+        const employeesSnap = await adminDb.collection('employees').where('companyName', '==', companyName).get();
+        const currentEmployeeCount = employeesSnap.size;
+
+        const companyDoc = await adminDb.collection('companies').doc(decodedToken.uid).get();
+        const companyData = companyDoc.exists ? companyDoc.data() : null;
+
+        const paidSeats = companyData?.subscription?.paidSeats || 0;
+        const maxEmployees = 5 + paidSeats;
+        const status = companyData?.subscription?.status;
+        const activeUntilDate = companyData?.subscription?.activeUntil ? companyData.subscription.activeUntil.toDate() : null;
+
+        if (paidSeats > 0) {
+            if (status !== 'active') {
+                return NextResponse.json({ error: 'Subscription is not active. Please renew your plan.' }, { status: 403 });
+            }
+            if (activeUntilDate && activeUntilDate < new Date()) {
+                return NextResponse.json({ error: 'Subscription expired. Please renew your plan.' }, { status: 403 });
+            }
+        }
+
+        if (currentEmployeeCount >= maxEmployees) {
+            return NextResponse.json({ error: 'Subscription limits exceeded. Please upgrade your plan (₹99/month per extra employee).' }, { status: 403 });
+        }
+
         // 2. Create user in Firebase Auth
         const userCredential = await adminAuth.createUser({
             email,

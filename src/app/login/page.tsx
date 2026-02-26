@@ -230,7 +230,7 @@ export default function LoginPage() {
                                     <Input
                                         id="email"
                                         type="email"
-                                        placeholder="name@company.com"
+                                        placeholder="e.g. jane.doe@acmecorp.com"
                                         value={email}
                                         onChange={e => setEmail(e.target.value)}
                                         required
@@ -284,7 +284,7 @@ export default function LoginPage() {
                                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                         <input
                                                             type="text"
-                                                            placeholder={loadingCompanies ? "Loading companies…" : "Search for your company…"}
+                                                            placeholder={loadingCompanies ? "Loading companies…" : "e.g. Acme Corporation..."}
                                                             value={companySearch}
                                                             onChange={e => {
                                                                 setCompanySearch(e.target.value);

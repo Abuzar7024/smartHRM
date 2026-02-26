@@ -114,6 +114,23 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
   }
+
+  /* ─── Global input aesthetics ───────────────────── */
+  input, textarea, select {
+    font-family: inherit;
+  }
+
+  ::placeholder {
+    color: hsl(215 16% 47%);
+    opacity: 0.65;
+    font-weight: 400;
+  }
+
+  /* Native input base style for raw <input> tags */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea {
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
 }
 
 /* ─── Glassmorphism ─────────────────────────────── */

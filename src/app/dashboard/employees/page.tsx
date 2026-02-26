@@ -33,6 +33,11 @@ export default function EmployeesPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
+    // Limits & Razorpay Upgrade State
+    const [showUpgrade, setShowUpgrade] = useState(false);
+    const [upgradeLoading, setUpgradeLoading] = useState(false);
+    const [employeesToAdd, setEmployeesToAdd] = useState(1);
+
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
@@ -97,6 +102,63 @@ export default function EmployeesPage() {
         emp.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const handleUpgrade = async () => {
+        setUpgradeLoading(true);
+        const loadRazorpayScript = () => {
+            return new Promise((resolve) => {
+                const script = document.createElement("script");
+                script.src = "https://checkout.razorpay.com/v1/checkout.js";
+                script.onload = () => resolve(true);
+                script.onerror = () => resolve(false);
+                document.body.appendChild(script);
+            });
+        };
+
+        const res = await loadRazorpayScript();
+        if (!res) {
+            toast.error("Razorpay SDK failed to load. Are you online?");
+            setUpgradeLoading(false);
+            return;
+        }
+
+        try {
+            const subscriptionData = await fetch('/api/create-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paidSeats: employeesToAdd })
+            }).then(t => t.json());
+
+            if (subscriptionData.error) {
+                toast.error(subscriptionData.error);
+                setUpgradeLoading(false);
+                return;
+            }
+
+            const options = {
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+                subscription_id: subscriptionData.subscriptionId,
+                name: "SmartHRM",
+                description: `Upgrade Plan: ${employeesToAdd} Paid Seats`,
+                theme: { color: "#4f46e5" },
+                handler: function (response: any) {
+                    toast.success(`Subscription Request Submitted! Your plan constraints will update shortly upon clearing.`);
+                    setError("");
+                    setShowUpgrade(false);
+                },
+            };
+
+            const rzp1 = new (window as any).Razorpay(options);
+            rzp1.on('payment.failed', function (response: any) {
+                toast.error(`Payment Failed: ${response.error.description}`);
+            });
+            rzp1.open();
+        } catch (err) {
+            toast.error("Error during upgrade process");
+        } finally {
+            setUpgradeLoading(false);
+        }
+    };
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!empName || !empEmail || !empPassword) return;
@@ -135,12 +197,16 @@ export default function EmployeesPage() {
             } else {
                 const data = await response.json();
                 setError(data.error || "Failed to add employee");
-                toast.error("Process Failed", { description: data.error || "Could not complete onboarding. Check permissions or network." });
-                createNotification({
-                    title: "Onboarding Terminated",
-                    message: `Internal System Error while trying to recruit ${empEmail}: ${data.error || "Network error"}`,
-                    targetRole: "employer"
-                });
+                if (data.error?.includes("Subscription limits exceeded")) {
+                    setShowUpgrade(true);
+                } else {
+                    toast.error("Process Failed", { description: data.error || "Could not complete onboarding. Check permissions or network." });
+                    createNotification({
+                        title: "Onboarding Terminated",
+                        message: `Internal System Error while trying to recruit ${empEmail}: ${data.error || "Network error"}`,
+                        targetRole: "employer"
+                    });
+                }
             }
         } catch (err) {
             setError("A network error occurred.");
@@ -192,11 +258,11 @@ export default function EmployeesPage() {
                                 <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Full Name</Label>
-                                        <Input required value={empName} onChange={e => setEmpName(e.target.value)} placeholder="e.g. John Doe" className="rounded-lg" />
+                                        <Input required value={empName} onChange={e => setEmpName(e.target.value)} placeholder="e.g. Jane Doe" className="rounded-lg" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Work Email</Label>
-                                        <Input required type="email" value={empEmail} onChange={e => setEmpEmail(e.target.value)} placeholder="name@company.com" className="rounded-lg" />
+                                        <Input required type="email" value={empEmail} onChange={e => setEmpEmail(e.target.value)} placeholder="e.g. jane.doe@acmecorp.com" className="rounded-lg" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Initial Password</Label>
@@ -221,7 +287,7 @@ export default function EmployeesPage() {
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Position</Label>
-                                        <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Frontend Developer" className="rounded-lg" />
+                                        <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Senior Frontend Engineer" className="rounded-lg" />
                                     </div>
                                     <div className="space-y-1.5 lg:col-span-2">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
@@ -242,9 +308,36 @@ export default function EmployeesPage() {
                                     </div>
 
                                     {error && (
-                                        <div className="md:col-span-2 lg:col-span-3 bg-rose-50 border border-rose-200 p-3 rounded-lg flex items-center gap-2 text-rose-600 text-xs font-medium">
-                                            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                                            {error}
+                                        <div className="md:col-span-2 lg:col-span-3 bg-rose-50 border border-rose-200 p-3 rounded-lg flex flex-col gap-2 text-rose-600 text-xs font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                                {error}
+                                            </div>
+                                            {showUpgrade && (
+                                                <div className="mt-2 p-3 bg-white border border-rose-100 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                    <div>
+                                                        <p className="text-slate-900 font-bold text-sm">Upgrade Subscription</p>
+                                                        <p className="text-slate-500 font-normal">Add more employee slots to your plan.</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            min={1}
+                                                            value={employeesToAdd}
+                                                            onChange={(e) => setEmployeesToAdd(parseInt(e.target.value) || 1)}
+                                                            className="w-20 h-9"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            onClick={handleUpgrade}
+                                                            disabled={upgradeLoading}
+                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-9"
+                                                        >
+                                                            {upgradeLoading ? "Processing..." : `Pay ₹${employeesToAdd * 99}`}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -271,7 +364,7 @@ export default function EmployeesPage() {
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
-                            placeholder="Search names, emails..."
+                            placeholder="Find a colleague by name or email..."
                             className="pl-9 h-9 rounded-lg border-slate-200 text-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}

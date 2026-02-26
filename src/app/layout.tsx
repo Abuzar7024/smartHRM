@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   title: "SmartHR — Intelligent Workforce Management",
   description: "A modern, role-based Human Resource Management portal with AI-powered insights for employers and employees.",
   keywords: ["HR", "Human Resources", "Workforce Management", "Payroll", "Attendance", "SmartHR"],
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

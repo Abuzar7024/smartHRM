@@ -38,7 +38,7 @@ function LeaveTypeBadge({ type, isHalfDay }: { type: string; isHalfDay?: boolean
 
 export default function LeavesPage() {
     const { role, user } = useAuth();
-    const { employees, leaves, requestLeave, updateLeaveStatus, updateLeaveBalance } = useApp();
+    const { employees, leaves, requestLeave, updateLeaveStatus, leaveBalances, addLeaveBalance, updateLeaveBalance, deleteLeaveBalance, approveLeaveRequest, rejectLeaveRequest } = useApp();
 
     const [showForm, setShowForm] = useState(false);
     const [selectedEmpEmail, setSelectedEmpEmail] = useState("");
@@ -49,11 +49,14 @@ export default function LeavesPage() {
     const [leaveDescription, setLeaveDescription] = useState("");
     const [leaveDaysAllocation, setLeaveDaysAllocation] = useState(0);
     const [leaveTypeFilter, setLeaveTypeFilter] = useState("All");
+    const [viewMode, setViewMode] = useState<"Requests" | "Balances">("Requests");
 
     const displayLeaves = (role === "employer"
         ? leaves
         : leaves.filter(l => l.empEmail === user?.email)
     ).filter(l => leaveTypeFilter === "All" || l.type === leaveTypeFilter);
+
+    const myBalances = leaveBalances.filter(b => b.empEmail === user?.email);
 
     // Compute days for a leave request
     const calcDays = (from: string, to: string, half: boolean) => {
@@ -68,10 +71,11 @@ export default function LeavesPage() {
 
         if (role === "employer") {
             if (!selectedEmpEmail || leaveDaysAllocation <= 0) return;
-            const targetEmp = employees.find(e => e.email === selectedEmpEmail);
-            if (!targetEmp?.id) return;
-            await updateLeaveBalance(targetEmp.id, leaveDaysAllocation);
-            toast.success("Leave Balance Updated", { description: `${targetEmp.name} now has ${leaveDaysAllocation} days.` });
+            await addLeaveBalance({
+                empEmail: selectedEmpEmail,
+                balance: leaveDaysAllocation,
+                type: leaveType
+            });
             setShowForm(false);
             setSelectedEmpEmail("");
             setLeaveDaysAllocation(0);
@@ -102,7 +106,6 @@ export default function LeavesPage() {
     };
 
     // Stats
-    const myLeaveBalance = role === "employee" ? (employees.find(e => e.email === user?.email)?.leaveBalance ?? 0) : null;
     const totalPending = leaves.filter(l => l.status === "Pending" && (role === "employer" || l.empEmail === user?.email)).length;
     const totalApproved = leaves.filter(l => l.status === "Approved" && (role === "employer" || l.empEmail === user?.email)).length;
 
@@ -145,26 +148,26 @@ export default function LeavesPage() {
                                 <CalendarDays className="w-5 h-5" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Leave Balance</p>
-                                <p className="text-2xl font-bold text-slate-900">{myLeaveBalance} <span className="text-sm font-medium text-slate-400">days</span></p>
-                                {/* Per-type used breakdown */}
-                                {Object.entries(usedByType).length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {Object.entries(usedByType).map(([type, used]) => {
-                                            const cfg = LEAVE_TYPE_CONFIG[type];
+                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Leave Portfolio</p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {myBalances.length === 0 ? (
+                                        <p className="text-[10px] text-slate-400 italic">No assigned balances yet.</p>
+                                    ) : (
+                                        myBalances.map(bal => {
+                                            const cfg = LEAVE_TYPE_CONFIG[bal.type];
                                             return (
-                                                <span key={type} className={cn(
-                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                                    cfg?.color ?? "text-slate-700",
-                                                    cfg?.bg ?? "bg-slate-100",
-                                                    cfg?.border ?? "border-slate-200"
+                                                <div key={bal.id} className={cn(
+                                                    "px-3 py-2 rounded-xl border flex flex-col items-center min-w-[80px]",
+                                                    cfg?.bg || "bg-slate-50",
+                                                    cfg?.border || "border-slate-100"
                                                 )}>
-                                                    {cfg?.label ?? type}: −{used}d
-                                                </span>
+                                                    <span className={cn("text-[10px] font-black uppercase tracking-widest", cfg?.color || "text-slate-500")}>{cfg?.label || bal.type}</span>
+                                                    <span className="text-lg font-bold text-slate-900">{bal.balance}d</span>
+                                                </div>
                                             );
-                                        })}
-                                    </div>
-                                )}
+                                        })
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -224,8 +227,20 @@ export default function LeavesPage() {
                                                     <option value="">Select employee</option>
                                                     {employees.map(emp => (
                                                         <option key={emp.id} value={emp.email}>
-                                                            {emp.name} ({emp.email}) — Current: {emp.leaveBalance ?? 0}d
+                                                            {emp.name} ({emp.email})
                                                         </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-sm font-semibold">Leave Type</Label>
+                                                <select
+                                                    className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={leaveType}
+                                                    onChange={e => setLeaveType(e.target.value)}
+                                                >
+                                                    {leaveTypeOptions.filter(t => t !== "Half Day Leave").map(t => (
+                                                        <option key={t}>{t}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -238,7 +253,7 @@ export default function LeavesPage() {
                                                     max="365"
                                                     placeholder="e.g. 20"
                                                     className="rounded-lg"
-                                                    value={leaveDaysAllocation}
+                                                    value={leaveDaysAllocation || ""}
                                                     onChange={e => setLeaveDaysAllocation(Number(e.target.value))}
                                                 />
                                             </div>
@@ -309,7 +324,7 @@ export default function LeavesPage() {
                                                 <Input
                                                     required
                                                     className="rounded-lg"
-                                                    placeholder="Provide context for this leave..."
+                                                    placeholder="e.g. Traveling out of town for a family event..."
                                                     value={leaveDescription}
                                                     onChange={e => setLeaveDescription(e.target.value)}
                                                 />
@@ -321,9 +336,10 @@ export default function LeavesPage() {
                                                     <CalendarDays className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                                                     <p className="text-sm text-indigo-800 font-medium">
                                                         This request will deduct <strong>{previewDays} day{previewDays !== 1 ? "s" : ""}</strong> from your leave balance
-                                                        {myLeaveBalance !== null && (
-                                                            <> &nbsp;(remaining after: <strong>{Math.max(0, myLeaveBalance - previewDays)} days</strong>)</>
-                                                        )}.
+                                                        {(() => {
+                                                            const currentBal = myBalances.find(b => b.type === leaveType)?.balance ?? 0;
+                                                            return <> &nbsp;(remaining after: <strong>{Math.max(0, currentBal - previewDays)} days</strong>)</>;
+                                                        })()}
                                                     </p>
                                                 </div>
                                             )}
@@ -341,137 +357,239 @@ export default function LeavesPage() {
                 )}
             </AnimatePresence>
 
-            {/* ── Filter Tabs ── */}
-            <div className="flex flex-wrap gap-2">
-                {allTypes.map(t => (
+            {/* ── Tabs for Employer ── */}
+            {role === "employer" && (
+                <div className="flex border-b border-slate-200">
                     <button
-                        key={t}
-                        onClick={() => setLeaveTypeFilter(t)}
+                        onClick={() => setViewMode("Requests")}
                         className={cn(
-                            "text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors",
-                            leaveTypeFilter === t
-                                ? "bg-slate-900 text-white border-slate-900"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                            "px-6 py-3 text-sm font-bold border-b-2 transition-all",
+                            viewMode === "Requests" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"
                         )}
                     >
-                        {t}
+                        Requested Leaves
                     </button>
-                ))}
-            </div>
+                    <button
+                        onClick={() => setViewMode("Balances")}
+                        className={cn(
+                            "px-6 py-3 text-sm font-bold border-b-2 transition-all",
+                            viewMode === "Balances" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"
+                        )}
+                    >
+                        Employee Balances
+                    </button>
+                </div>
+            )}
+
+            {/* ── Filter Tabs ── */}
+            {viewMode === "Requests" && (
+                <div className="flex flex-wrap gap-2">
+                    {allTypes.map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setLeaveTypeFilter(t)}
+                            className={cn(
+                                "text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors",
+                                leaveTypeFilter === t
+                                    ? "bg-slate-900 text-white border-slate-900"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                            )}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* ── Leave Table ── */}
-            <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
-                <CardHeader className="p-4 md:p-6 bg-slate-50/50 border-b flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-lg font-bold">Leave History</CardTitle>
-                        <CardDescription>View and manage {role === "employer" ? "all" : "your"} leave applications.</CardDescription>
-                    </div>
-                </CardHeader>
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
-                                {role === "employer" && <TableHead className="w-[200px] h-10">Employee</TableHead>}
-                                <TableHead className="h-10">Type</TableHead>
-                                <TableHead className="h-10">Period</TableHead>
-                                <TableHead className="h-10">Deduction</TableHead>
-                                <TableHead className="h-10">Status</TableHead>
-                                {role === "employer" && <TableHead className="h-10 text-right">Actions</TableHead>}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {displayLeaves.map((leave) => {
-                                const deduction = leave.isHalfDay ? 0.5 : (leave.days ?? Math.max(1, Math.ceil((new Date(leave.to).getTime() - new Date(leave.from).getTime()) / 86400000 + 1)));
-                                return (
-                                    <TableRow key={leave.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                                        {role === "employer" && (
-                                            <TableCell className="py-4">
-                                                <div className="font-semibold text-slate-900">{leave.empName}</div>
-                                                <div className="text-[11px] text-slate-500">{leave.empEmail}</div>
-                                            </TableCell>
-                                        )}
-                                        <TableCell className="py-4">
-                                            <LeaveTypeBadge type={leave.type} isHalfDay={leave.isHalfDay} />
-                                            <div className="text-xs text-slate-400 italic line-clamp-1 truncate max-w-[200px] mt-1">
-                                                &quot;{leave.description || "No notes"}&quot;
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                            <div className="text-sm font-medium text-slate-700">
-                                                {new Date(leave.from).toLocaleDateString()}
-                                            </div>
-                                            {!leave.isHalfDay && (
-                                                <div className="text-[10px] text-slate-400 font-bold uppercase">
-                                                    to {new Date(leave.to).toLocaleDateString()}
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                            <span className={cn(
-                                                "text-sm font-bold",
-                                                leave.status === "Approved" ? "text-rose-600" : "text-slate-400"
-                                            )}>
-                                                {leave.status === "Approved" ? `−${deduction}d` : `${deduction}d`}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                            <Badge
-                                                variant={
-                                                    leave.status === "Approved" ? "success" :
-                                                        leave.status === "Pending" ? "warning" : "destructive"
-                                                }
-                                                className="rounded-md font-bold text-[10px] h-5 px-2"
-                                            >
-                                                {leave.status}
-                                            </Badge>
-                                        </TableCell>
-                                        {role === "employer" && (
-                                            <TableCell className="py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {leave.status === "Pending" && (
-                                                        <>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon-sm"
-                                                                className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                                                                onClick={() => updateLeaveStatus(leave.id!, "Denied")}
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="corporate"
-                                                                className="h-8 text-[11px] rounded-lg shadow-none"
-                                                                onClick={() => {
-                                                                    updateLeaveStatus(leave.id!, "Approved");
-                                                                    const d = leave.isHalfDay ? 0.5 : (leave.days ?? 1);
-                                                                    toast.success("Leave Approved", { description: `−${d} day(s) deducted from ${leave.empName}'s balance.` });
-                                                                }}
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                );
-                            })}
-                            {displayLeaves.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={role === "employer" ? 6 : 4} className="text-center py-20 text-slate-400">
-                                        <div className="flex flex-col items-center gap-2 opacity-30">
-                                            <CalendarDays className="w-8 h-8" />
-                                            <p className="text-sm font-medium">No leave records found</p>
-                                        </div>
-                                    </TableCell>
+            {viewMode === "Requests" ? (
+                <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="p-4 md:p-6 bg-slate-50/50 border-b flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle className="text-lg font-bold">
+                                {role === "employer" && leaves.filter(l => l.status === "Pending").length > 0 ? "Pending Approvals" : "Leave History"}
+                            </CardTitle>
+                            <CardDescription>
+                                {role === "employer" && leaves.filter(l => l.status === "Pending").length > 0
+                                    ? `There are ${leaves.filter(l => l.status === "Pending").length} requests awaiting your decision.`
+                                    : `View and manage ${role === "employer" ? "all" : "your"} leave applications.`}
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
+                                    {role === "employer" && <TableHead className="w-[200px] h-10">Employee</TableHead>}
+                                    <TableHead className="h-10">Type</TableHead>
+                                    <TableHead className="h-10">Period</TableHead>
+                                    <TableHead className="h-10">Deduction</TableHead>
+                                    <TableHead className="h-10">Status</TableHead>
+                                    {role === "employer" && <TableHead className="h-10 text-right">Actions</TableHead>}
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-            </Card>
+                            </TableHeader>
+                            <TableBody>
+                                {displayLeaves.map((leave) => {
+                                    const deduction = leave.isHalfDay ? 0.5 : (leave.days ?? Math.max(1, Math.ceil((new Date(leave.to).getTime() - new Date(leave.from).getTime()) / 86400000 + 1)));
+                                    return (
+                                        <TableRow key={leave.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                            {role === "employer" && (
+                                                <TableCell className="py-4">
+                                                    <div className="font-semibold text-slate-900">{leave.empName}</div>
+                                                    <div className="text-[11px] text-slate-500">{leave.empEmail}</div>
+                                                </TableCell>
+                                            )}
+                                            <TableCell className="py-4">
+                                                <LeaveTypeBadge type={leave.type} isHalfDay={leave.isHalfDay} />
+                                                <div className="text-xs text-slate-400 italic line-clamp-1 truncate max-w-[200px] mt-1">
+                                                    &quot;{leave.description || "No notes"}&quot;
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <div className="text-sm font-medium text-slate-700">
+                                                    {new Date(leave.from).toLocaleDateString()}
+                                                </div>
+                                                {!leave.isHalfDay && (
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase">
+                                                        to {new Date(leave.to).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <span className={cn(
+                                                    "text-sm font-bold",
+                                                    leave.status === "Approved" ? "text-rose-600" : "text-slate-400"
+                                                )}>
+                                                    {leave.status === "Approved" ? `−${deduction}d` : `${deduction}d`}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <Badge
+                                                    variant={
+                                                        leave.status === "Approved" ? "success" :
+                                                            leave.status === "Pending" ? "warning" : "destructive"
+                                                    }
+                                                    className="rounded-md font-bold text-[10px] h-5 px-2"
+                                                >
+                                                    {leave.status}
+                                                </Badge>
+                                            </TableCell>
+                                            {role === "employer" && (
+                                                <TableCell className="py-4 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {leave.status === "Pending" && (
+                                                            <>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                                                                    onClick={() => rejectLeaveRequest(leave.id!)}
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="corporate"
+                                                                    className="h-8 text-[11px] rounded-lg shadow-none"
+                                                                    onClick={() => approveLeaveRequest(leave.id!)}
+                                                                >
+                                                                    Approve
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            )}
+                                        </TableRow>
+                                    );
+                                })}
+                                {displayLeaves.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={role === "employer" ? 6 : 5} className="text-center py-20 text-slate-400">
+                                            <div className="flex flex-col items-center gap-2 opacity-30">
+                                                <CalendarDays className="w-8 h-8" />
+                                                <p className="text-sm font-medium">No leave records found</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </Card>
+            ) : (
+                <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="p-4 md:p-6 bg-slate-50/50 border-b">
+                        <CardTitle className="text-lg font-bold">Leave Balances</CardTitle>
+                        <CardDescription>Manage and update employee time-off allocations.</CardDescription>
+                    </CardHeader>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
+                                    <TableHead className="h-10">Employee</TableHead>
+                                    <TableHead className="h-10">Type</TableHead>
+                                    <TableHead className="h-10">Balance</TableHead>
+                                    <TableHead className="h-10 text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {leaveBalances.map((bal) => (
+                                    <TableRow key={bal.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                        <TableCell className="py-4">
+                                            <div className="font-semibold text-slate-900">
+                                                {employees.find(e => e.email === bal.empEmail)?.name || "Employee"}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500">{bal.empEmail}</div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                            <LeaveTypeBadge type={bal.type} />
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-700">{bal.balance} days</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2 group-hover:opacity-100 transition-opacity">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    className="text-slate-400 hover:text-rose-500 rounded-lg"
+                                                    onClick={() => deleteLeaveBalance(bal.id!)}
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-xs font-bold text-slate-600 hover:text-slate-900"
+                                                    onClick={() => {
+                                                        const newVal = prompt("Enter new balance:", bal.balance.toString());
+                                                        if (newVal !== null) updateLeaveBalance(bal.id!, Number(newVal));
+                                                    }}
+                                                >
+                                                    Modify
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {leaveBalances.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-20 text-slate-400">
+                                            <div className="flex flex-col items-center gap-2 opacity-30">
+                                                <Plus className="w-8 h-8" />
+                                                <p className="text-sm font-medium">No leave balances allocated yet</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </Card>
+            )}
         </div>
     );
 }

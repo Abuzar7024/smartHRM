@@ -19,17 +19,20 @@ import {
     CheckSquare,
     LogOut,
     BarChart3,
-    BarChart2,
+    ShieldCheck,
     UsersRound,
     MessageSquare,
-    Network
+    Network,
+    FileText,
+    UserPlus,
+    Wallet
 } from "lucide-react";
 import { useState } from "react";
 
 export function Sidebar() {
     const pathname = usePathname();
     const { role, logout, user } = useAuth();
-    const { teams, chatMessages, chatReadTimestamps } = useApp();
+    const { teams, chatMessages, chatReadTimestamps, profileUpdates, employees } = useApp();
     const [collapsed, setCollapsed] = useState(false);
 
     const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
@@ -44,17 +47,23 @@ export function Sidebar() {
         }).length
         : 0;
 
+    const pendingProfileUpdates = profileUpdates?.filter(r => r.status === "Pending").length || 0;
+
     const employerLinks = [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
         { name: "Employees", href: "/dashboard/employees", icon: Users },
         { name: "Teams", href: "/dashboard/teams", icon: UsersRound },
         { name: "Hierarchy", href: "/dashboard/hierarchy", icon: Network },
         { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, badge: unreadChats },
+        { name: "Assign Task", href: "/dashboard/tasks/assign", icon: UserPlus },
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
+        { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
+        { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
         { name: "Recruitment", href: "/dashboard/recruitment", icon: Briefcase },
+        { name: "Billing", href: "/dashboard/billing", icon: Wallet },
     ];
 
     const employeeLinks = [
@@ -62,6 +71,7 @@ export function Sidebar() {
         { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, badge: unreadChats },
         // All team members + leaders can see Teams
         ...((isTeamLeader || isTeamMember) ? [{ name: "Teams", href: "/dashboard/teams", icon: UsersRound, badge: 0 }] : []),
+        { name: "Assign Task", href: "/dashboard/tasks/assign", icon: UserPlus, hidden: !employees.find(e => e.email === user?.email)?.permissions?.includes("assign_tasks") },
         { name: "My Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "My Profile", href: "/dashboard/profile", icon: User },
         { name: "My Payslips", href: "/dashboard/payslips", icon: CreditCard },
@@ -85,15 +95,15 @@ export function Sidebar() {
                 )}>
                     {!collapsed && (
                         <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center flex-shrink-0">
-                                <BarChart2 className="w-4 h-4 text-white" />
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
+                                <ShieldCheck className="w-4 h-4 text-white" />
                             </div>
                             <span className="text-white font-semibold text-lg tracking-tight whitespace-nowrap">SmartHR</span>
                         </div>
                     )}
                     {collapsed && (
-                        <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
-                            <BarChart2 className="w-4 h-4 text-white" />
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <ShieldCheck className="w-4 h-4 text-white" />
                         </div>
                     )}
 
@@ -117,7 +127,7 @@ export function Sidebar() {
 
                 {/* ── Nav links ── */}
                 <nav className={cn("p-3 space-y-0.5 mt-2", collapsed && "mt-4")}>
-                    {navLinks.map((link) => {
+                    {navLinks.filter(l => !(l as any).hidden).map((link) => {
                         const isActive = pathname === link.href;
                         const badgeCount = link.badge ?? 0;
                         return (
@@ -164,10 +174,14 @@ export function Sidebar() {
                 {!collapsed && user && (
                     <div className="mb-2 px-3 py-2.5 rounded-lg bg-white/5 border border-white/8">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-blue-500/30 border border-blue-400/30 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-bold text-blue-300">
-                                    {user.email?.charAt(0).toUpperCase()}
-                                </span>
+                            <div className="w-7 h-7 rounded-full bg-blue-500/30 border border-blue-400/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                {employees.find(e => e.email === user.email)?.photoURL ? (
+                                    <img src={employees.find(e => e.email === user.email)!.photoURL} className="w-full h-full object-cover" alt="Profile" />
+                                ) : (
+                                    <span className="text-xs font-bold text-blue-300">
+                                        {user.email?.charAt(0).toUpperCase()}
+                                    </span>
+                                )}
                             </div>
                             <div className="overflow-hidden">
                                 <p className="text-xs font-semibold text-white/90 truncate">{user.email}</p>
