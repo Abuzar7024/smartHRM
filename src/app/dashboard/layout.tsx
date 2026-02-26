@@ -66,6 +66,14 @@ export default function DashboardLayout({
         });
     }, [myNotifications, isClient]);
 
+    useEffect(() => {
+        if (isClient && !loading && !user) {
+            // Frontend Auth state was lost but session cookie let them in.
+            // Force logout to clear cookie and redirect.
+            logout();
+        }
+    }, [isClient, loading, user, logout]);
+
     if (!isClient || loading) {
         return (
             <div className="flex h-screen items-center justify-center bg-slate-50">
