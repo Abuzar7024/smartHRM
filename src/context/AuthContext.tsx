@@ -11,6 +11,7 @@ interface AuthContextType {
     user: User | null;
     role: Role;
     status: string | null;
+    companyName: string | null;
     loading: boolean;
     logout: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     role: null,
     status: null,
+    companyName: null,
     loading: true,
     logout: async () => { },
 });
@@ -29,6 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [role, setRole] = useState<Role>(null);
     const [status, setStatus] = useState<string | null>(null);
+    const [companyName, setCompanyName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -41,18 +44,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         const data = userDoc.data();
                         setRole(data.role as Role);
                         setStatus(data.status || "active");
+                        setCompanyName(data.companyName || null);
                     } else {
                         setRole("employee");
                         setStatus("active");
+                        setCompanyName(null);
                     }
                 } catch (error) {
-                    console.error("Error fetching user role", error);
+                    console.error("Error fetching user details", error);
                     setRole("employee");
                     setStatus("active");
+                    setCompanyName(null);
                 }
             } else {
                 setRole(null);
                 setStatus(null);
+                setCompanyName(null);
             }
             setLoading(false);
         });
@@ -67,7 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, status, loading, logout }}>
+        <AuthContext.Provider value={{ user, role, status, companyName, loading, logout }}>
             {children}
         </AuthContext.Provider>
     );

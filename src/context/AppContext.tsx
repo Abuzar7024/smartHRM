@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
+import { useAuth } from "./AuthContext";
 
-export type Employee = { id?: string; name: string; role: string; department: string; status: string; email: string; leaveBalance?: number; permissions?: string[]; joinDate?: string };
-export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string };
+export type Employee = { id?: string; name: string; role: string; position?: string; department: string; status: string; email: string; leaveBalance?: number; permissions?: string[]; joinDate?: string; companyName?: string };
+export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
 export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out" | "Break Start" | "Break End"; timestamp: string };
 export type Task = { id?: string; title: string; description: string; assigneeId: string; assigneeEmail: string; status: "Pending" | "In Progress" | "Completed"; priority: "Low" | "Medium" | "High"; dueDate: string; createdAt: string };
@@ -84,6 +85,8 @@ export const useApp = () => {
 };
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
+    const { companyName, role, status } = useAuth();
+
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [leaves, setLeaves] = useState<Leave[]>([]);
     const [payroll, setPayroll] = useState<Payroll[]>([]);
@@ -103,44 +106,61 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     ]);
 
     useEffect(() => {
+        if (!companyName) {
+            // Clear all data if there is no company context (logged out or unassigned)
+            setEmployees([]);
+            setLeaves([]);
+            setPayroll([]);
+            setAttendance([]);
+            setTasks([]);
+            setDocuments([]);
+            setNotifications([]);
+            setJobs([]);
+            setTeams([]);
+            setChatMessages([]);
+            setPendingRegistrations([]);
+            setChatReadTimestamps({});
+            return;
+        }
+
         try {
-            const unsubEmployees = onSnapshot(collection(db, "employees"), (snapshot) => {
+            const unsubEmployees = onSnapshot(query(collection(db, "employees"), where("companyName", "==", companyName)), (snapshot) => {
                 setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
             }, (error) => console.log("Firebase Employees Error Setup:", error.message));
 
-            const unsubLeaves = onSnapshot(query(collection(db, "leaves"), orderBy("from", "desc")), (snapshot) => {
+            const unsubLeaves = onSnapshot(query(collection(db, "leaves"), where("companyName", "==", companyName), orderBy("from", "desc")), (snapshot) => {
                 setLeaves(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leave)));
             }, (error) => console.log("Firebase Leaves Error Setup:", error.message));
 
-            const unsubPayroll = onSnapshot(collection(db, "payroll"), (snapshot) => {
+            const unsubPayroll = onSnapshot(query(collection(db, "payroll"), where("companyName", "==", companyName)), (snapshot) => {
                 setPayroll(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
             }, (error) => console.log("Firebase Payroll Error Setup:", error.message));
 
-            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), orderBy("timestamp", "desc")), (snapshot) => {
+            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName), orderBy("timestamp", "desc")), (snapshot) => {
                 setAttendance(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
             }, (error) => console.log("Firebase Attendance Error Setup:", error.message));
 
-            const unsubTasks = onSnapshot(query(collection(db, "tasks"), orderBy("createdAt", "desc")), (snapshot) => {
+            const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("companyName", "==", companyName), orderBy("createdAt", "desc")), (snapshot) => {
                 setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
             }, (error) => console.log("Firebase Tasks Error Setup:", error.message));
 
-            const unsubDocuments = onSnapshot(collection(db, "documents"), (snapshot) => {
+            const unsubDocuments = onSnapshot(query(collection(db, "documents"), where("companyName", "==", companyName)), (snapshot) => {
                 setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument)));
             }, (error) => console.log("Firebase Docs Error Setup:", error.message));
 
-            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), orderBy("timestamp", "desc")), (snapshot) => {
+            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), where("companyName", "==", companyName), orderBy("timestamp", "desc")), (snapshot) => {
                 setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificationItem)));
             }, (error) => console.log("Firebase Notifications Error Setup:", error.message));
 
-            const unsubJobs = onSnapshot(query(collection(db, "jobs"), orderBy("postedAt", "desc")), (snapshot) => {
+            const unsubJobs = onSnapshot(query(collection(db, "jobs"), where("companyName", "==", companyName), orderBy("postedAt", "desc")), (snapshot) => {
                 setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
             }, (error) => console.log("Firebase Jobs Error Setup:", error.message));
 
-            const unsubTeams = onSnapshot(query(collection(db, "teams"), orderBy("createdAt", "desc")), (snapshot) => {
+            const unsubTeams = onSnapshot(query(collection(db, "teams"), where("companyName", "==", companyName), orderBy("createdAt", "desc")), (snapshot) => {
                 setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team)));
             }, (error) => console.log("Firebase Teams Error Setup:", error.message));
 
-            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), orderBy("timestamp", "asc")), (snapshot) => {
+            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), where("companyName", "==", companyName), orderBy("timestamp", "asc")), (snapshot) => {
                 setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage)));
             }, (error) => console.log("Firebase Chat Error Setup:", error.message));
 
@@ -152,7 +172,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
             // Listen for pending employee registrations (users with status=pending)
             const unsubPending = onSnapshot(
-                query(collection(db, "users"), where("status", "==", "pending")),
+                query(collection(db, "users"), where("companyName", "==", companyName), where("status", "==", "pending")),
                 (snapshot) => {
                     setPendingRegistrations(snapshot.docs.map(d => ({
                         uid: d.id,
@@ -191,12 +211,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (e) {
             console.error("Firebase config missing or invalid.", e);
         }
-    }, []);
+    }, [companyName]);
 
     const addEmployee = async (emp: Employee) => {
         try {
             await addDoc(collection(db, "employees"), {
                 ...emp,
+                companyName: companyName, // Inject company context
                 joinDate: emp.joinDate || new Date().toISOString(),
                 permissions: emp.permissions || []
             });
@@ -267,7 +288,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: (await getDocs(query(collection(db, "users"), where("__name__", "==", uid)))).docs[0]?.data().email,
-                targetRole: "employee"
+                targetRole: "employee",
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error approving registration:", e);
@@ -300,14 +322,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const requestLeave = async (leave: Leave) => {
         try {
-            await addDoc(collection(db, "leaves"), leave);
+            await addDoc(collection(db, "leaves"), { ...leave, companyName });
             // Create notification for Medical leaves mostly, or all leaves for employers
             await addDoc(collection(db, "notifications"), {
                 title: `${leave.type} Request`,
                 message: `${leave.empName} has requested ${leave.type} from ${leave.from} to ${leave.to}.`,
                 timestamp: new Date().toISOString(),
                 isRead: false,
-                targetRole: "employer"
+                targetRole: "employer",
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error requesting leave: ", e);
@@ -350,7 +373,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     department: emp.department,
                     amount: `₹${(Math.random() * 40000 + 30000).toFixed(0)}`, // Base 30,000 to 70,000 INR
                     status: "Paid",
-                    date: new Date().toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' })
+                    date: new Date().toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }),
+                    companyName: companyName
                 });
             });
             await Promise.all(payrollPromises);
@@ -366,7 +390,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 message: `Employee ${email} has requested their recent payslip.`,
                 timestamp: new Date().toISOString(),
                 isRead: false,
-                targetRole: "employer"
+                targetRole: "employer",
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error requesting payslip: ", e);
@@ -378,7 +403,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await addDoc(collection(db, "attendance"), {
                 empEmail: email,
                 type: "Clock In",
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error clocking in: ", e);
@@ -390,7 +416,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await addDoc(collection(db, "attendance"), {
                 empEmail: email,
                 type: "Clock Out",
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error clocking out: ", e);
@@ -402,7 +429,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await addDoc(collection(db, "attendance"), {
                 empEmail: email,
                 type: "Break Start",
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error starting break: ", e);
@@ -414,7 +442,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await addDoc(collection(db, "attendance"), {
                 empEmail: email,
                 type: "Break End",
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error ending break: ", e);
@@ -425,6 +454,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             await addDoc(collection(db, "tasks"), {
                 ...task,
+                companyName: companyName,
                 createdAt: new Date().toISOString()
             });
         } catch (e) {
@@ -442,7 +472,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const requestDocument = async (email: string, title: string) => {
         try {
-            await addDoc(collection(db, "documents"), { empEmail: email, title, status: "Pending", requestedAt: new Date().toISOString() });
+            await addDoc(collection(db, "documents"), { empEmail: email, title, status: "Pending", requestedAt: new Date().toISOString(), companyName });
             // Persistent in-app notification for the employee
             await addDoc(collection(db, "notifications"), {
                 title: "📄 Document Required",
@@ -450,7 +480,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: email,
-                targetRole: "employee"
+                targetRole: "employee",
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error requesting document:", e);
@@ -465,7 +496,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: email,
-                targetRole: "employee"
+                targetRole: "employee",
+                companyName: companyName
             });
         } catch (e) {
             console.error("Error sending reminder:", e);
@@ -492,6 +524,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             await addDoc(collection(db, "notifications"), {
                 ...notif,
+                companyName: companyName,
                 timestamp: new Date().toISOString(),
                 isRead: false
             });
@@ -538,6 +571,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             await addDoc(collection(db, "teams"), {
                 ...team,
+                companyName: companyName,
                 createdAt: new Date().toISOString()
             });
         } catch (e) {
@@ -581,7 +615,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 ...job,
                 applicants: 0,
                 postedAt: new Date().toISOString(),
-                status: "Active"
+                status: "Active",
+                companyName: companyName
             });
         } catch (e) {
             console.error(e);
@@ -600,6 +635,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             await addDoc(collection(db, "chat_messages"), {
                 ...msg,
+                companyName: companyName,
                 timestamp: new Date().toISOString()
             });
         } catch (e) {

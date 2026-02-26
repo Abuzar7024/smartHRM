@@ -27,6 +27,7 @@ export default function EmployeesPage() {
     const [empName, setEmpName] = useState("");
     const [empEmail, setEmpEmail] = useState("");
     const [empRole, setEmpRole] = useState("");
+    const [empPosition, setEmpPosition] = useState("");
     const [empDept, setEmpDept] = useState("");
     const [empPassword, setEmpPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -112,6 +113,7 @@ export default function EmployeesPage() {
                     email: empEmail,
                     password: empPassword,
                     role: empRole || "Staff",
+                    position: empPosition || "Staff",
                     department: empDept || "General"
                 }),
             });
@@ -128,6 +130,7 @@ export default function EmployeesPage() {
                 setEmpEmail("");
                 setEmpPassword("");
                 setEmpRole("");
+                setEmpPosition("");
                 setEmpDept("");
             } else {
                 const data = await response.json();
@@ -150,6 +153,7 @@ export default function EmployeesPage() {
         } finally {
             setLoading(false);
         }
+
     };
 
     return (
@@ -215,6 +219,10 @@ export default function EmployeesPage() {
                                             <option value="Intern">Intern</option>
                                         </select>
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Position</Label>
+                                        <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Frontend Developer" className="rounded-lg" />
+                                    </div>
                                     <div className="space-y-1.5 lg:col-span-2">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
                                         <select
@@ -275,7 +283,7 @@ export default function EmployeesPage() {
                         <TableHeader>
                             <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
                                 <TableHead className="h-10">Name & Contact</TableHead>
-                                <TableHead className="h-10">Role</TableHead>
+                                <TableHead className="h-10">Role & Position</TableHead>
                                 <TableHead className="h-10">Department</TableHead>
                                 <TableHead className="h-10">DOJ / Status</TableHead>
                                 <TableHead className="h-10 text-right">Permissions & Actions</TableHead>
@@ -297,7 +305,10 @@ export default function EmployeesPage() {
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="py-4 text-sm font-medium text-slate-700">{emp.role}</TableCell>
+                                    <TableCell className="py-4 text-sm text-slate-700">
+                                        <div className="font-medium">{emp.role}</div>
+                                        {emp.position && <div className="text-xs text-slate-500 mt-0.5">{emp.position}</div>}
+                                    </TableCell>
                                     <TableCell className="py-4 text-sm text-slate-500">{emp.department}</TableCell>
                                     <TableCell className="py-4">
                                         <div className="flex flex-col items-start gap-1">

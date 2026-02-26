@@ -142,10 +142,14 @@ export default function LoginPage() {
                 }
 
                 if (role === "employee") {
-                    await auth.signOut();
-                    setMsg("Registration submitted! Your employer will review and approve your access. You will be able to log in once approved.");
-                    setLoading(false);
-                    return;
+                    await addDoc(collection(db, "notifications"), {
+                        title: "New Registration",
+                        message: `${email} has registered and is waiting for your approval to join ${companyName}.`,
+                        timestamp: new Date().toISOString(),
+                        isRead: false,
+                        targetRole: "employer",
+                        companyName: companyName
+                    });
                 }
             }
 
