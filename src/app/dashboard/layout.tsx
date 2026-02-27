@@ -452,9 +452,6 @@ export default function DashboardLayout({
                                                         <Wallet className="w-4 h-4" /> Billing
                                                     </button>
                                                 )}
-                                                <button onClick={() => router.push("/dashboard")} className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors">
-                                                    <Settings className="w-4 h-4" /> Settings
-                                                </button>
                                                 <div className="h-[1px] bg-slate-100 my-1" />
                                                 <button onClick={logout} className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg hover:bg-rose-50 text-rose-600 transition-colors">
                                                     <LogOut className="w-4 h-4" /> Log out

@@ -21,9 +21,18 @@ export default function ProfilePage() {
     const searchParams = useSearchParams();
     const targetId = searchParams.get("id");
 
-    const employeeRecord = targetId && role === "employer"
+    const foundEmployee = targetId && role === "employer"
         ? employees.find(e => e.id === targetId)
         : employees.find(e => e.email === user?.email);
+
+    const employeeRecord = (foundEmployee || (role === "employer" && !targetId && user ? {
+        id: "employer_profile",
+        name: user.displayName || user.email?.split("@")[0] || "Employer",
+        email: user.email || "",
+        department: "Administration",
+        position: "Administrator",
+        joinDate: new Date().toISOString()
+    } : null)) as any;
 
     const [formData, setFormData] = useState<any>({
         firstName: "", lastName: "", department: "", position: "",
