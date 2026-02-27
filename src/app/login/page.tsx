@@ -60,7 +60,7 @@ export default function LoginPage() {
     }, []);
 
     const filteredCompanies = companies.filter(c =>
-        c.name.toLowerCase().includes(companySearch.toLowerCase())
+        c.name?.toLowerCase().includes(companySearch.toLowerCase())
     );
 
     const handlePasswordReset = async () => {
