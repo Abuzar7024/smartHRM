@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp, Employee } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -9,19 +9,27 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle, Lock, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function EmployeesPage() {
     const { role } = useAuth();
-    const { employees, documents, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
+    const router = useRouter();
+    const { employees, documents, docTemplates, requestMultipleDocuments, addDocTemplate, deleteDocTemplate, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [deletingEmp, setDeletingEmp] = useState<{ id: string; name: string; email: string } | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [selectedDocsToReq, setSelectedDocsToReq] = useState<string[]>([]);
+
+    // Document Template Modal State
+    const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
+    const [docTitle, setDocTitle] = useState("");
+    const [docRequired, setDocRequired] = useState(false);
 
     // Form State
     const [empName, setEmpName] = useState("");
@@ -34,14 +42,29 @@ export default function EmployeesPage() {
     const [error, setError] = useState("");
 
     // Limits & Razorpay Upgrade State
-    const [showUpgrade, setShowUpgrade] = useState(false);
-    const [upgradeLoading, setUpgradeLoading] = useState(false);
-    const [employeesToAdd, setEmployeesToAdd] = useState(1);
+    const [employeeLimit, setEmployeeLimit] = useState(5);
+    const [fetchingLimit, setFetchingLimit] = useState(true);
 
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
     const [detailsEmp, setDetailsEmp] = useState<Employee | null>(null);
+
+    useEffect(() => {
+        if (role === "employer") {
+            fetch("/api/billing/status")
+                .then(res => res.json())
+                .then(data => {
+                    if (data.subscription?.employeeLimit) {
+                        setEmployeeLimit(data.subscription.employeeLimit);
+                    }
+                })
+                .catch(() => { })
+                .finally(() => setFetchingLimit(false));
+        }
+    }, [role]);
+
+    const isLimitReached = employees.length >= employeeLimit && !fetchingLimit;
 
     const togglePermission = (perm: string) => {
         if (!selectedEmp) return;
@@ -97,67 +120,11 @@ export default function EmployeesPage() {
     }
 
     const filtered = employees.filter(emp =>
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (emp.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (emp.department?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (emp.email?.toLowerCase() || "").includes(searchTerm.toLowerCase())
     );
 
-    const handleUpgrade = async () => {
-        setUpgradeLoading(true);
-        const loadRazorpayScript = () => {
-            return new Promise((resolve) => {
-                const script = document.createElement("script");
-                script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                script.onload = () => resolve(true);
-                script.onerror = () => resolve(false);
-                document.body.appendChild(script);
-            });
-        };
-
-        const res = await loadRazorpayScript();
-        if (!res) {
-            toast.error("Razorpay SDK failed to load. Are you online?");
-            setUpgradeLoading(false);
-            return;
-        }
-
-        try {
-            const subscriptionData = await fetch('/api/create-subscription', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paidSeats: employeesToAdd })
-            }).then(t => t.json());
-
-            if (subscriptionData.error) {
-                toast.error(subscriptionData.error);
-                setUpgradeLoading(false);
-                return;
-            }
-
-            const options = {
-                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-                subscription_id: subscriptionData.subscriptionId,
-                name: "SmartHRM",
-                description: `Upgrade Plan: ${employeesToAdd} Paid Seats`,
-                theme: { color: "#4f46e5" },
-                handler: function (response: any) {
-                    toast.success(`Subscription Request Submitted! Your plan constraints will update shortly upon clearing.`);
-                    setError("");
-                    setShowUpgrade(false);
-                },
-            };
-
-            const rzp1 = new (window as any).Razorpay(options);
-            rzp1.on('payment.failed', function (response: any) {
-                toast.error(`Payment Failed: ${response.error.description}`);
-            });
-            rzp1.open();
-        } catch (err) {
-            toast.error("Error during upgrade process");
-        } finally {
-            setUpgradeLoading(false);
-        }
-    };
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -187,6 +154,12 @@ export default function EmployeesPage() {
                     message: `Operative ${empName} (${empEmail}) was added to the ${empDept} unit as a ${empRole}.`,
                     targetRole: "employer"
                 });
+
+                if (selectedDocsToReq.length > 0) {
+                    await requestMultipleDocuments(empEmail, selectedDocsToReq);
+                    toast.success("Documents Requested", { description: "Onboarding documents have been requested." });
+                }
+
                 setShowForm(false);
                 setEmpName("");
                 setEmpEmail("");
@@ -194,11 +167,13 @@ export default function EmployeesPage() {
                 setEmpRole("");
                 setEmpPosition("");
                 setEmpDept("");
+                setSelectedDocsToReq([]);
             } else {
                 const data = await response.json();
                 setError(data.error || "Failed to add employee");
                 if (data.error?.includes("Subscription limits exceeded")) {
-                    setShowUpgrade(true);
+                    // Force the button logic to update immediately
+                    setEmployeeLimit(employees.length);
                 } else {
                     toast.error("Process Failed", { description: data.error || "Could not complete onboarding. Check permissions or network." });
                     createNotification({
@@ -230,19 +205,28 @@ export default function EmployeesPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Employee Directory</h1>
                     <p className="text-sm text-slate-500">Manage your workforce, roles, and departmental access.</p>
                 </div>
-                <Button
-                    className="rounded-lg shadow-sm"
-                    variant={showForm ? "outline" : "corporate"}
-                    onClick={() => setShowForm(!showForm)}
-                >
-                    {showForm ? <Plus className="w-4 h-4 mr-2 rotate-45 transition-transform" /> : <UserPlus className="w-4 h-4 mr-2" />}
-                    {showForm ? "Close Form" : "Add Employee"}
-                </Button>
+                {isLimitReached ? (
+                    <Button
+                        className="rounded-lg shadow-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                        onClick={() => router.push("/dashboard/billing")}
+                    >
+                        <Lock className="w-4 h-4 mr-2" /> Upgrade to Add Seats
+                    </Button>
+                ) : (
+                    <Button
+                        className="rounded-lg shadow-sm"
+                        variant={showForm ? "outline" : "corporate"}
+                        onClick={() => setShowForm(!showForm)}
+                    >
+                        {showForm ? <Plus className="w-4 h-4 mr-2 rotate-45 transition-transform" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                        {showForm ? "Close Form" : "Add Employee"}
+                    </Button>
+                )}
             </div>
 
             {/* ── Add Form ── */}
             <AnimatePresence>
-                {showForm && (
+                {showForm && !isLimitReached && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
@@ -252,7 +236,7 @@ export default function EmployeesPage() {
                         <Card className="border-slate-200 shadow-md rounded-xl">
                             <CardHeader className="bg-slate-50/50 border-b">
                                 <CardTitle className="text-lg font-bold">Onboard New Employee</CardTitle>
-                                <CardDescription>Register a new member to the organization.</CardDescription>
+                                <CardDescription>Register a new member to the organization. Limt: {employees.length}/{employeeLimit} used.</CardDescription>
                             </CardHeader>
                             <CardContent className="p-6">
                                 <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -307,37 +291,96 @@ export default function EmployeesPage() {
                                         </select>
                                     </div>
 
+                                    {/* Onboarding Documents Field */}
+                                    <div className="space-y-1.5 lg:col-span-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase">Required Onboarding Documents</Label>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-[10px] text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 uppercase font-bold tracking-widest rounded-lg"
+                                                onClick={() => setIsManageDocsOpen(true)}
+                                            >
+                                                <Settings className="w-3 h-3 mr-1" /> Manage Templates
+                                            </Button>
+                                        </div>
+
+                                        <Dialog open={isManageDocsOpen} onOpenChange={setIsManageDocsOpen}>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Document Templates</DialogTitle>
+                                                    <DialogDescription>Define standard files that need to be requested during onboarding.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4 py-3">
+                                                    <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50 max-h-[250px] overflow-y-auto">
+                                                        {docTemplates.map(tpl => (
+                                                            <div key={tpl.id} className="flex items-center justify-between bg-white p-2 border rounded-md shadow-sm">
+                                                                <div>
+                                                                    <p className="text-sm font-semibold">{tpl.title}</p>
+                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? "Mandatory" : "Optional"}</p>
+                                                                </div>
+                                                                <Button type="button" variant="ghost" size="sm" onClick={() => deleteDocTemplate(tpl.id!)} className="text-rose-500 hover:bg-rose-50 h-8 w-8 p-0">
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                        {docTemplates.length === 0 && <p className="text-xs text-slate-500 italic text-center py-4">No templates defined.</p>}
+                                                    </div>
+                                                    <div className="space-y-2 pt-2 border-t">
+                                                        <Label className="text-xs font-bold">Add Document Type</Label>
+                                                        <Input placeholder="e.g. 2024 W2 Tax Form or Offer Letter" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm rounded-lg" />
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500" />
+                                                            <Label htmlFor="reqDoc" className="text-xs cursor-pointer">Is this document strictly mandatory?</Label>
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            variant="corporate"
+                                                            className="w-full mt-2 h-9 text-xs rounded-lg mt-4 shadow-sm"
+                                                            onClick={() => {
+                                                                if (docTitle.trim()) {
+                                                                    addDocTemplate(docTitle.trim(), docRequired);
+                                                                    setDocTitle("");
+                                                                    setDocRequired(false);
+                                                                    toast.success("Template Added!");
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5 mr-1" /> Create Template
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+                                            {docTemplates.length === 0 ? (
+                                                <p className="text-xs text-slate-400 italic col-span-full">No document templates available to request.</p>
+                                            ) : (
+                                                docTemplates.map(doc => (
+                                                    <label key={doc.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-slate-200 shadow-sm cursor-pointer hover:border-slate-300">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                                                            checked={selectedDocsToReq.includes(doc.title)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedDocsToReq(prev => [...prev, doc.title]);
+                                                                else setSelectedDocsToReq(prev => prev.filter(t => t !== doc.title));
+                                                            }}
+                                                        />
+                                                        <span className="font-medium text-slate-700">{doc.title} {doc.required && <span className="text-rose-500">*</span>}</span>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {error && (
                                         <div className="md:col-span-2 lg:col-span-3 bg-rose-50 border border-rose-200 p-3 rounded-lg flex flex-col gap-2 text-rose-600 text-xs font-medium">
                                             <div className="flex items-center gap-2">
                                                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                                                 {error}
                                             </div>
-                                            {showUpgrade && (
-                                                <div className="mt-2 p-3 bg-white border border-rose-100 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
-                                                    <div>
-                                                        <p className="text-slate-900 font-bold text-sm">Upgrade Subscription</p>
-                                                        <p className="text-slate-500 font-normal">Add more employee slots to your plan.</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            type="number"
-                                                            min={1}
-                                                            value={employeesToAdd}
-                                                            onChange={(e) => setEmployeesToAdd(parseInt(e.target.value) || 1)}
-                                                            className="w-20 h-9"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            onClick={handleUpgrade}
-                                                            disabled={upgradeLoading}
-                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-9"
-                                                        >
-                                                            {upgradeLoading ? "Processing..." : `Pay ₹${employeesToAdd * 99}`}
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 
@@ -359,7 +402,9 @@ export default function EmployeesPage() {
                 <CardHeader className="p-4 md:p-6 bg-slate-50/50 border-b flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-lg font-bold">Workforce Database</CardTitle>
-                        <CardDescription>Total active personnel: {employees.length}</CardDescription>
+                        <CardDescription>
+                            Total active personnel: {employees.length} / {fetchingLimit ? "..." : employeeLimit} Seats Used
+                        </CardDescription>
                     </div>
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -388,10 +433,10 @@ export default function EmployeesPage() {
                                     <TableCell className="py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600">
-                                                {emp.name[0].toUpperCase()}
+                                                {(emp.name || emp.email || "U")[0].toUpperCase()}
                                             </div>
                                             <div>
-                                                <div className="font-semibold text-slate-900">{emp.name}</div>
+                                                <div className="font-semibold text-slate-900">{emp.name || "Unnamed"}</div>
                                                 <div className="text-xs text-slate-500 flex items-center gap-1">
                                                     <Mail className="w-3 h-3" /> {emp.email}
                                                 </div>
@@ -456,53 +501,55 @@ export default function EmployeesPage() {
             </Card>
 
             {/* ── Pending Registrations ── */}
-            {pendingRegistrations.length > 0 && (
-                <Card className="border-amber-200 bg-amber-50 shadow-none">
-                    <CardHeader className="pb-2 pt-4 px-5">
-                        <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            Pending Employee Registration Requests ({pendingRegistrations.length})
-                        </CardTitle>
-                        <CardDescription className="text-amber-700 text-xs">These users registered and are awaiting your approval to join your organization.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-5 pb-4 space-y-2">
-                        {pendingRegistrations.map(reg => {
-                            const matchedEmp = employees.find(e => e.email === reg.email);
-                            return (
-                                <div key={reg.uid} className="flex items-center justify-between bg-white border border-amber-200 rounded-lg p-3 gap-3">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">{reg.email}</p>
-                                        {reg.companyName && <p className="text-xs text-slate-500">Company: {reg.companyName}</p>}
+            {
+                pendingRegistrations.length > 0 && (
+                    <Card className="border-amber-200 bg-amber-50 shadow-none">
+                        <CardHeader className="pb-2 pt-4 px-5">
+                            <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" />
+                                Pending Employee Registration Requests ({pendingRegistrations.length})
+                            </CardTitle>
+                            <CardDescription className="text-amber-700 text-xs">These users registered and are awaiting your approval to join your organization.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-5 pb-4 space-y-2">
+                            {pendingRegistrations.map(reg => {
+                                const matchedEmp = employees.find(e => e.email === reg.email);
+                                return (
+                                    <div key={reg.uid} className="flex items-center justify-between bg-white border border-amber-200 rounded-lg p-3 gap-3">
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800">{reg.email}</p>
+                                            {reg.companyName && <p className="text-xs text-slate-500">Company: {reg.companyName}</p>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {matchedEmp ? (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                        onClick={() => { approveRegistration(reg.uid, matchedEmp.id!); toast.success("Approved!", { description: `${reg.email} can now log in.` }); }}
+                                                    >
+                                                        <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 border-rose-200 text-rose-600 hover:bg-rose-50"
+                                                        onClick={() => { rejectRegistration(reg.uid); toast.error("Rejected", { description: `${reg.email} has been denied access.` }); }}
+                                                    >
+                                                        <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <p className="text-xs text-amber-600 italic">Add this email as an employee first to approve</p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        {matchedEmp ? (
-                                            <>
-                                                <Button
-                                                    size="sm"
-                                                    className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                    onClick={() => { approveRegistration(reg.uid, matchedEmp.id!); toast.success("Approved!", { description: `${reg.email} can now log in.` }); }}
-                                                >
-                                                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 border-rose-200 text-rose-600 hover:bg-rose-50"
-                                                    onClick={() => { rejectRegistration(reg.uid); toast.error("Rejected", { description: `${reg.email} has been denied access.` }); }}
-                                                >
-                                                    <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <p className="text-xs text-amber-600 italic">Add this email as an employee first to approve</p>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </CardContent>
-                </Card>
-            )}
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                )
+            }
 
             {/* ── Delete Confirm Dialog ── */}
             <Dialog open={!!deletingEmp} onOpenChange={(v) => { if (!v) setDeletingEmp(null); }}>
@@ -621,6 +668,6 @@ export default function EmployeesPage() {
                     })()}
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }

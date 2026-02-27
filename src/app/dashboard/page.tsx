@@ -453,11 +453,11 @@ export default function DashboardOverview() {
                                         <div key={emp.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 text-xs">
-                                                    {emp.name.charAt(0).toUpperCase()}
+                                                    {(emp.name || emp.email || "U").charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold text-slate-900 text-sm leading-tight">{emp.name}</p>
-                                                    <p className="text-[10px] text-slate-500 font-medium">{emp.email}</p>
+                                                    <p className="font-semibold text-slate-900 text-sm leading-tight">{emp.name || "Unnamed"}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">{emp.email || "No Email"}</p>
                                                 </div>
                                             </div>
                                             <Badge variant={emp.status === "Active" ? "success" : "warning"} className="text-[10px]">

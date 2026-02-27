@@ -25,7 +25,8 @@ import {
     Network,
     FileText,
     UserPlus,
-    Wallet
+    Wallet,
+    FileCog
 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,6 +60,7 @@ export function Sidebar() {
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
         { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
+        { name: "Onboarding Templates", href: "/dashboard/templates", icon: FileCog },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
@@ -94,12 +96,12 @@ export function Sidebar() {
                     collapsed ? "justify-center px-4" : "justify-between px-5"
                 )}>
                     {!collapsed && (
-                        <div className="flex items-center gap-3 overflow-hidden">
+                        <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
                                 <ShieldCheck className="w-4 h-4 text-white" />
                             </div>
                             <span className="text-white font-semibold text-lg tracking-tight whitespace-nowrap">SmartHR</span>
-                        </div>
+                        </Link>
                     )}
                     {collapsed && (
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">

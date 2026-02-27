@@ -504,7 +504,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const updateEmployee = async (id: string, updates: Partial<Employee>) => {
         try {
-            await updateDoc(doc(db, "employees", id), updates);
+            if (id === "employer_profile") {
+                await setDoc(doc(db, "employees", user!.uid), { ...updates, companyName, role: "employer", email: user!.email }, { merge: true });
+            } else {
+                await updateDoc(doc(db, "employees", id), updates);
+            }
         } catch (e) {
             console.error("Error updating employee details:", e);
         }
@@ -1131,12 +1135,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const uploadProfileImage = async (file: File) => {
-        if (!user?.email || !companyName) return;
+        if (!user?.uid) {
+            toast.error("Upload Failed", { description: "User session not found." });
+            return;
+        }
         try {
             const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
             const { storage } = await import("@/lib/firebase");
 
-            const storageRef = ref(storage, `profiles/${companyName}/${user.email}/${file.name}`);
+            const safeCompanyName = companyName || "standalone_users";
+            const storageRef = ref(storage, `profiles/${safeCompanyName}/${user.uid}/${file.name}`);
             await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(storageRef);
 
@@ -1144,6 +1152,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const emp = employees.find(e => e.email === user.email);
             if (emp?.id) {
                 await updateDoc(doc(db, "employees", emp.id), { photoURL: downloadURL });
+            } else if (role === "employer") {
+                await setDoc(doc(db, "employees", user.uid), { photoURL: downloadURL, companyName: companyName || "", role: "employer", email: user.email }, { merge: true });
             }
 
             // Also update the users collection if it exists for auth metadata
@@ -1152,10 +1162,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 await updateDoc(doc(db, "users", usersSnap.docs[0].id), { photoURL: downloadURL });
             }
 
-            toast.success("Profile Authenticated", { description: "Your biometric avatar has been updated in the workforce registry." });
+            toast.success("Profile Picture Updated", { description: "Your profile picture has been updated successfully." });
         } catch (e) {
             console.error("Error uploading profile image:", e);
-            toast.error("Upload Failed", { description: "Repository was unable to ingest the media file." });
+            toast.error("Upload Failed", { description: "Failed to upload your profile picture. Please try again." });
         }
     };
 

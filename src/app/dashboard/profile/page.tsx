@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useSearchParams } from "next/navigation";
@@ -22,17 +22,16 @@ export default function ProfilePage() {
     const targetId = searchParams.get("id");
 
     const foundEmployee = targetId && role === "employer"
-        ? employees.find(e => e.id === targetId)
-        : employees.find(e => e.email === user?.email);
-
-    const employeeRecord = (foundEmployee || (role === "employer" && !targetId && user ? {
-        id: "employer_profile",
-        name: user.displayName || user.email?.split("@")[0] || "Employer",
-        email: user.email || "",
-        department: "Administration",
-        position: "Administrator",
-        joinDate: new Date().toISOString()
-    } : null)) as any;
+    const employeeRecord = useMemo(() => {
+        return (foundEmployee || (role === "employer" && !targetId && user ? {
+            id: "employer_profile",
+            name: user.displayName || user.email?.split("@")[0] || "Employer",
+            email: user.email || "",
+            department: "Administration",
+            position: "Administrator",
+            joinDate: "N/A"
+        } : null)) as any;
+    }, [foundEmployee, role, targetId, user]);
 
     const [formData, setFormData] = useState<any>({
         firstName: "", lastName: "", department: "", position: "",
@@ -42,8 +41,10 @@ export default function ProfilePage() {
         name: "", email: "", joinDate: ""
     });
 
+    const [lastLoadedId, setLastLoadedId] = useState<string | null>(null);
+
     useEffect(() => {
-        if (employeeRecord) {
+        if (employeeRecord && employeeRecord.id !== lastLoadedId) {
             setFormData({
                 name: employeeRecord.name || "",
                 email: employeeRecord.email || "",
@@ -65,8 +66,9 @@ export default function ProfilePage() {
                 firstName: employeeRecord.name?.split(" ")[0] || "",
                 lastName: employeeRecord.name?.split(" ").slice(1).join(" ") || "",
             });
+            setLastLoadedId(employeeRecord.id);
         }
-    }, [employeeRecord]);
+    }, [employeeRecord, lastLoadedId]);
 
     if (!employeeRecord) {
         return (
@@ -80,6 +82,8 @@ export default function ProfilePage() {
         );
     }
 
+    // Allow user to edit their own profile or if they are admin
+    const canEdit = role === "employer" || !targetId || targetId === employeeRecord.id;
     const isAdmin = role === "employer";
 
     const handleSaveEditable = async () => {
@@ -92,6 +96,9 @@ export default function ProfilePage() {
             linkedin: formData.linkedin,
             aboutMe: formData.aboutMe,
             fathersName: formData.fathersName,
+            department: formData.department,
+            position: formData.position,
+            name: `${formData.firstName} ${formData.lastName}`.trim(),
         });
         toast.success("Profile Synchronized", {
             description: "Your personal information has been updated successfully.",
@@ -110,7 +117,7 @@ export default function ProfilePage() {
             panCard: formData.panCard,
         };
 
-        if (isAdmin) {
+        if (role === "employer") {
             await updateEmployee(employeeRecord.id, financials);
             toast.success("Record Modified", { description: "Administrative changes applied directly." });
         } else {
@@ -128,7 +135,7 @@ export default function ProfilePage() {
     };
 
     const handleSaveSystem = async () => {
-        if (!employeeRecord.id || !isAdmin) return;
+        if (!employeeRecord.id || !canEdit) return;
         await updateEmployee(employeeRecord.id, {
             name: `${formData.firstName} ${formData.lastName}`.trim(),
             department: formData.department,
@@ -163,44 +170,20 @@ export default function ProfilePage() {
 
                     {/* --- Left Column: Identity --- */}
                     <div className="lg:col-span-4 space-y-6">
-                        <Card className="border-slate-200 shadow-sm rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl sticky top-6">
+                        <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white/80 backdrop-blur-xl sticky top-6">
                             <CardContent className="p-0">
                                 <div className="p-8 flex flex-col items-center">
                                     <div className="relative mb-6">
-                                        <div className="w-32 h-32 rounded-3xl bg-slate-50 border-2 border-slate-100 p-1 relative group overflow-hidden">
-                                            <div className="w-full h-full rounded-[1.25rem] bg-white flex items-center justify-center text-slate-200 overflow-hidden">
+                                        <div className="w-32 h-32 rounded-xl bg-slate-50 border-2 border-slate-100 p-1 relative group overflow-hidden">
+                                            <div className="w-full h-full rounded-lg bg-white flex items-center justify-center text-slate-200 overflow-hidden shadow-inner">
                                                 {employeeRecord.photoURL ? (
                                                     <img src={employeeRecord.photoURL} alt={employeeRecord.name} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <UserIcon className="w-16 h-16" />
+                                                    <div className="bg-gradient-to-br from-slate-100 to-slate-200 w-full h-full flex flex-col items-center justify-center">
+                                                        <UserIcon className="w-12 h-12 text-slate-400 mb-2" />
+                                                    </div>
                                                 )}
                                             </div>
-                                            {!targetId && (
-                                                <>
-                                                    <input
-                                                        type="file"
-                                                        id="avatar-upload"
-                                                        className="hidden"
-                                                        accept="image/png, image/jpeg"
-                                                        onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (file) {
-                                                                if (file.size > 2 * 1024 * 1024) {
-                                                                    toast.error("File Too Large", { description: "Biometric image must be under 2MB for registry ingestion." });
-                                                                    return;
-                                                                }
-                                                                await uploadProfileImage(file);
-                                                            }
-                                                        }}
-                                                    />
-                                                    <button
-                                                        onClick={() => document.getElementById("avatar-upload")?.click()}
-                                                        className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
-                                                    >
-                                                        <Camera className="w-6 h-6" />
-                                                    </button>
-                                                </>
-                                            )}
                                         </div>
                                     </div>
 
@@ -259,21 +242,21 @@ export default function ProfilePage() {
                                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <ShieldCheck className="w-3.5 h-3.5" /> System Identity
                                 </h3>
-                                {isAdmin && (
+                                {canEdit && (
                                     <Button onClick={handleSaveSystem} size="sm" variant="ghost" className="text-slate-600 hover:text-slate-900 font-bold text-xs h-8">
                                         <Save className="w-3 h-3 mr-2" /> Update Registry
                                     </Button>
                                 )}
                             </div>
-                            <Card className="border-slate-200 shadow-sm rounded-3xl bg-white overflow-hidden">
+                            <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
                                 <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1">Legal First Name *</Label>
                                         <Input
                                             value={formData.firstName || ""}
                                             onChange={e => setFormData({ ...formData, firstName: e.target.value })}
-                                            readOnly={!isAdmin}
-                                            className={cn("h-11 rounded-2xl bg-slate-50/30 border-slate-100", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
+                                            readOnly={!canEdit}
+                                            className={cn("h-10 rounded-md border-slate-200 bg-white", !canEdit && "read-only:opacity-60 cursor-not-allowed")}
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -281,8 +264,8 @@ export default function ProfilePage() {
                                         <Input
                                             value={formData.lastName || ""}
                                             onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                                            readOnly={!isAdmin}
-                                            className={cn("h-11 rounded-2xl bg-slate-50/30 border-slate-100", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
+                                            readOnly={!canEdit}
+                                            className={cn("h-10 rounded-md border-slate-200 bg-white", !canEdit && "read-only:opacity-60 cursor-not-allowed")}
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -291,7 +274,7 @@ export default function ProfilePage() {
                                             value={formData.position || ""}
                                             onChange={e => setFormData({ ...formData, position: e.target.value })}
                                             readOnly={!isAdmin}
-                                            className={cn("h-11 rounded-2xl bg-slate-50/30 border-slate-100", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
+                                            className={cn("h-10 rounded-md border-slate-200 bg-white", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -300,7 +283,7 @@ export default function ProfilePage() {
                                             value={formData.department || ""}
                                             onChange={e => setFormData({ ...formData, department: e.target.value })}
                                             readOnly={!isAdmin}
-                                            className={cn("h-11 rounded-2xl bg-slate-50/30 border-slate-100", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
+                                            className={cn("h-10 rounded-md border-slate-200 bg-white", !isAdmin && "read-only:opacity-60 cursor-not-allowed")}
                                         />
                                     </div>
                                 </CardContent>
@@ -317,32 +300,32 @@ export default function ProfilePage() {
                                     <Save className="w-3.5 h-3.5 mr-2" /> Sync Profile
                                 </Button>
                             </div>
-                            <Card className="border-slate-200 shadow-sm rounded-3xl bg-white overflow-hidden">
+                            <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
                                 <CardContent className="p-8 space-y-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Father's Name (Optional)</Label>
-                                            <Input value={formData.fathersName || ""} onChange={e => setFormData({ ...formData, fathersName: e.target.value })} placeholder="Your father's full name..." className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.fathersName || ""} onChange={e => setFormData({ ...formData, fathersName: e.target.value })} placeholder="Your father's full name..." className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Contact Number *</Label>
-                                            <Input value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="Your primary mobile reach..." className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.phone || ""} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="Your primary mobile reach..." className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                         <div className="space-y-1.5 md:col-span-2">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Residential Address *</Label>
-                                            <Input value={formData.address || ""} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Your full residential address..." className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.address || ""} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Your full residential address..." className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Emergency Contact Name</Label>
-                                            <Input value={formData.emergencyContactName || ""} onChange={e => setFormData({ ...formData, emergencyContactName: e.target.value })} placeholder="Who should we call in an emergency?" className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.emergencyContactName || ""} onChange={e => setFormData({ ...formData, emergencyContactName: e.target.value })} placeholder="Who should we call in an emergency?" className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">Emergency Phone</Label>
-                                            <Input value={formData.emergencyContactPhone || ""} onChange={e => setFormData({ ...formData, emergencyContactPhone: e.target.value })} placeholder="+91 XXXX XXX XXX" className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.emergencyContactPhone || ""} onChange={e => setFormData({ ...formData, emergencyContactPhone: e.target.value })} placeholder="+91 XXXX XXX XXX" className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                         <div className="space-y-1.5 md:col-span-2">
                                             <Label className="text-xs font-bold text-slate-400 ml-1">LinkedIn Profile</Label>
-                                            <Input value={formData.linkedin || ""} onChange={e => setFormData({ ...formData, linkedin: e.target.value })} placeholder="linkedin.com/in/username" className="h-11 rounded-2xl border-slate-200 focus:ring-slate-900" />
+                                            <Input value={formData.linkedin || ""} onChange={e => setFormData({ ...formData, linkedin: e.target.value })} placeholder="linkedin.com/in/username" className="h-10 rounded-md border-slate-200 focus:ring-2 focus:ring-slate-200 focus:ring-offset-1" />
                                         </div>
                                     </div>
                                     <div className="space-y-2 pt-6 border-t border-slate-50">
@@ -351,7 +334,7 @@ export default function ProfilePage() {
                                             value={formData.aboutMe || ""}
                                             onChange={e => setFormData({ ...formData, aboutMe: e.target.value })}
                                             placeholder="Introduce yourself professionally..."
-                                            className="min-h-[120px] rounded-2xl border-slate-200 text-sm leading-relaxed resize-none p-4"
+                                            className="min-h-[120px] rounded-md border border-slate-200 text-sm leading-relaxed resize-none p-4"
                                         />
                                     </div>
                                 </CardContent>
@@ -375,31 +358,31 @@ export default function ProfilePage() {
                                     {isAdmin ? <><Save className="w-3 h-3 mr-2" /> Commit Records</> : <><Send className="w-3 h-3 mr-2" /> Request Approval</>}
                                 </Button>
                             </div>
-                            <Card className="border-slate-200 shadow-sm rounded-3xl bg-white overflow-hidden relative">
+                            <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden relative">
                                 <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1 flex items-center gap-1.5">
                                             <FileText className="w-3 h-3" /> Aadhaar Card Number *
                                         </Label>
-                                        <Input value={formData.govIdNumber || ""} onChange={e => setFormData({ ...formData, govIdNumber: e.target.value })} placeholder="12-digit number" className="h-11 rounded-2xl border-slate-200" />
+                                        <Input value={formData.govIdNumber || ""} onChange={e => setFormData({ ...formData, govIdNumber: e.target.value })} placeholder="12-digit number" className="h-10 rounded-md border-slate-200" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1 flex items-center gap-1.5">
                                             <FileText className="w-3 h-3" /> PAN Card Number *
                                         </Label>
-                                        <Input value={formData.panCard || ""} onChange={e => setFormData({ ...formData, panCard: e.target.value })} placeholder="10-digit alphanumeric" className="h-11 rounded-2xl border-slate-200 uppercase" />
+                                        <Input value={formData.panCard || ""} onChange={e => setFormData({ ...formData, panCard: e.target.value })} placeholder="10-digit alphanumeric" className="h-10 rounded-md border-slate-200 uppercase" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1">Bank Name *</Label>
-                                        <Input value={formData.bankName || ""} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. HDFC, ICICI, SBI" className="h-11 rounded-2xl border-slate-200" />
+                                        <Input value={formData.bankName || ""} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. HDFC, ICICI, SBI" className="h-10 rounded-md border-slate-200" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1">Account Number *</Label>
-                                        <Input value={formData.accountNumber || ""} type="password" onChange={e => setFormData({ ...formData, accountNumber: e.target.value })} placeholder="Primary Bank Account" className="h-11 rounded-2xl border-slate-200" />
+                                        <Input value={formData.accountNumber || ""} type="password" onChange={e => setFormData({ ...formData, accountNumber: e.target.value })} placeholder="Primary Bank Account" className="h-10 rounded-md border-slate-200" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-400 ml-1">IFSC / Routing Code</Label>
-                                        <Input value={formData.routingNumber || ""} onChange={e => setFormData({ ...formData, routingNumber: e.target.value })} placeholder="Bank location code" className="h-11 rounded-2xl border-slate-200 uppercase" />
+                                        <Input value={formData.routingNumber || ""} onChange={e => setFormData({ ...formData, routingNumber: e.target.value })} placeholder="Bank location code" className="h-10 rounded-md border-slate-200 uppercase" />
                                     </div>
                                 </CardContent>
                                 {!isAdmin && (
@@ -419,7 +402,7 @@ export default function ProfilePage() {
                                 </h3>
                                 <Badge variant="outline" className="text-[10px] font-bold border-slate-200 uppercase">Compliance Registry</Badge>
                             </div>
-                            <Card className="border-slate-200 shadow-sm rounded-3xl bg-white overflow-hidden">
+                            <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
                                 <CardContent className="p-0">
                                     {documents.filter(d => d.empEmail === (employees.find(e => e.id === (targetId || ""))?.email || user?.email || "")).length === 0 ? (
                                         <div className="p-12 text-center text-slate-400">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
@@ -95,10 +95,10 @@ export default function DashboardLayout({
         }
     }, [isClient, user, authLoading, router]);
 
-    const myNotifications = notifications.filter(
+    const myNotifications = useMemo(() => notifications.filter(
         n => (role === "employer" && n.targetRole === "employer") ||
             (role === "employee" && (n.targetEmail === user?.email || n.targetRole === "employee"))
-    );
+    ), [notifications, role, user?.email]);
 
     const unreadCount = myNotifications.filter(n => !n.isRead).length;
 
