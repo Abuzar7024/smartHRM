@@ -33,6 +33,7 @@ export type Employee = {
     fathersName?: string;
     aboutMe?: string;
     linkedin?: string;
+    ctc?: string;
 };
 export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };

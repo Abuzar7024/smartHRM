@@ -60,7 +60,6 @@ export function Sidebar() {
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
         { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
-        { name: "Onboarding Templates", href: "/dashboard/templates", icon: FileCog },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },

@@ -46,9 +46,7 @@ export default function EmployeesPage() {
     const [fetchingLimit, setFetchingLimit] = useState(true);
 
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
-    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
-    const [detailsEmp, setDetailsEmp] = useState<Employee | null>(null);
 
     useEffect(() => {
         if (role === "employer") {
@@ -614,60 +612,7 @@ export default function EmployeesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            {/* ── Employee Details Modal ── */}
-            <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Employee Profile</DialogTitle>
-                        <DialogDescription>Full work history and details for {detailsEmp?.name}</DialogDescription>
-                    </DialogHeader>
-                    {detailsEmp && (() => {
-                        const empDocs = documents.filter(d => d.empEmail === detailsEmp.email);
-                        const empLeaves = leaves.filter(l => l.empEmail === detailsEmp.email);
-                        const approvedLeaves = empLeaves.filter(l => l.status === "Approved").length;
-                        const empPayroll = payroll.filter(p => p.empEmail === detailsEmp.email);
-                        const latestCTC = empPayroll.length > 0 ? empPayroll[empPayroll.length - 1].amount : "TBD";
-                        const empAttendance = attendance.filter(a => a.empEmail === detailsEmp.email);
 
-                        return (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <p className="text-slate-500 font-medium text-[10px] uppercase">Date of Joining</p>
-                                        <p className="font-bold text-slate-800">{detailsEmp.joinDate ? new Date(detailsEmp.joinDate).toLocaleDateString() : "Unknown"}</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <p className="text-slate-500 font-medium text-[10px] uppercase">Current CTC</p>
-                                        <p className="font-bold text-emerald-600">{latestCTC}</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <p className="text-slate-500 font-medium text-[10px] uppercase">Assigned Leave Balance</p>
-                                        <p className="font-bold text-slate-800">{detailsEmp.leaveBalance || 0} Days Total</p>
-                                    </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <p className="text-slate-500 font-medium text-[10px] uppercase">Leaves Utilized</p>
-                                        <p className="font-bold text-amber-600">{approvedLeaves} Days Off</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-bold border-b pb-2 mb-3">Submitted Documents</h4>
-                                    {empDocs.length === 0 ? <p className="text-xs text-slate-500">No documents requested/submitted.</p> : (
-                                        <ul className="space-y-2">
-                                            {empDocs.map(d => (
-                                                <li key={d.id} className="text-xs flex justify-between items-center bg-white border border-slate-200 p-2.5 rounded-md shadow-sm">
-                                                    <span className="font-medium text-slate-700">{d.title}</span>
-                                                    <Badge variant={d.status === "Uploaded" ? "success" : "warning"} className="text-[10px]">{d.status}</Badge>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })()}
-                </DialogContent>
-            </Dialog>
         </div >
     );
 }

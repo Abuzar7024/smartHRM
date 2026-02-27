@@ -257,19 +257,22 @@ export default function EmployeeDocumentsPage() {
 
                                 <div className="mt-4 pt-4 border-t border-slate-50 flex gap-2">
                                     <Button
+                                        size="sm"
                                         variant="outline"
-                                        size="sm"
-                                        className="flex-1 text-[10px] font-bold h-8 rounded-lg"
-                                        onClick={() => setSearch(emp.email)}
+                                        className={cn(
+                                            "flex-1 text-[10px] font-bold h-8 rounded-lg transition-colors duration-200",
+                                            progress === 100
+                                                ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
+                                                : "border-slate-900 bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
+                                        )}
+                                        disabled={progress === 100}
+                                        onClick={() => {
+                                            sendDocumentReminder(emp.email, "Pending Onboarding Documents");
+                                            toast.info("Reminder Sent", { description: `Reminded ${emp.name} about their pending documents.` });
+                                        }}
                                     >
-                                        Filter Docs
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        className="flex-1 text-[10px] font-bold h-8 rounded-lg bg-slate-900 text-white"
-                                        onClick={() => window.location.href = `/dashboard/profile?id=${emp.id}`}
-                                    >
-                                        View Profile
+                                        <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                                        {progress === 100 ? "Onboarding Complete" : "Send Reminder"}
                                     </Button>
                                 </div>
                             </CardContent>
@@ -330,17 +333,17 @@ export default function EmployeeDocumentsPage() {
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-[0.2em] font-black">
                                     <tr>
-                                        <th className="px-8 py-5">Personnel</th>
-                                        <th className="px-8 py-5">Document Title</th>
-                                        <th className="px-8 py-5">Status</th>
-                                        <th className="px-8 py-5">Date</th>
-                                        <th className="px-8 py-5 text-right">Actions</th>
+                                        <th className="px-4 sm:px-6 py-4">Personnel</th>
+                                        <th className="px-4 sm:px-6 py-4">Document Title</th>
+                                        <th className="px-4 sm:px-6 py-4">Status</th>
+                                        <th className="px-4 sm:px-6 py-4">Date</th>
+                                        <th className="px-4 sm:px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredDocs.map(doc => (
                                         <tr key={doc.id} className="hover:bg-slate-50/30 transition-colors group">
-                                            <td className="px-8 py-5">
+                                            <td className="px-4 sm:px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">
                                                         {getEmployeeName(doc.empEmail)[0]?.toUpperCase()}
@@ -351,7 +354,7 @@ export default function EmployeeDocumentsPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5 font-bold text-slate-700">
+                                            <td className="px-4 sm:px-6 py-4 font-bold text-slate-700">
                                                 <div className="flex items-center gap-2.5">
                                                     <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm">
                                                         <FileText className="w-3.5 h-3.5" />
@@ -359,7 +362,7 @@ export default function EmployeeDocumentsPage() {
                                                     {doc.title}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5">
+                                            <td className="px-4 sm:px-6 py-4">
                                                 {doc.status === "Approved" ? (
                                                     <Badge variant="success" className="bg-emerald-500/10 text-emerald-600 border-none px-3 py-1 font-bold text-[10px]">VERIFIED</Badge>
                                                 ) : doc.status === "Rejected" ? (
@@ -370,10 +373,10 @@ export default function EmployeeDocumentsPage() {
                                                     <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-none px-3 py-1 font-bold text-[10px]">AWAITING UPLOAD</Badge>
                                                 )}
                                             </td>
-                                            <td className="px-8 py-5 text-slate-500 font-bold text-xs uppercase tracking-tighter">
+                                            <td className="px-4 sm:px-6 py-4 text-slate-500 font-bold text-xs uppercase tracking-tighter">
                                                 {doc.requestedAt ? new Date(doc.requestedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "---"}
                                             </td>
-                                            <td className="px-8 py-5 text-right">
+                                            <td className="px-4 sm:px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {/* View/Preview button - shown when file exists */}
                                                     {doc.url && (
