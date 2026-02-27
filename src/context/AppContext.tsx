@@ -229,26 +229,29 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
             const unsubLeaves = onSnapshot(
                 role === "employer"
-                    ? query(collection(db, "leaves"), where("companyName", "==", companyName), orderBy("from", "desc"))
-                    : query(collection(db, "leaves"), where("companyName", "==", companyName), where("empEmail", "==", user?.email), orderBy("from", "desc")),
+                    ? query(collection(db, "leaves"), where("companyName", "==", companyName))
+                    : query(collection(db, "leaves"), where("companyName", "==", companyName), where("empEmail", "==", user?.email)),
                 (snapshot) => {
-                    setLeaves(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leave)));
+                    const leavesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leave));
+                    setLeaves(leavesData.sort((a, b) => new Date(b.from).getTime() - new Date(a.from).getTime()));
                 }, (error) => console.log("Firebase Leaves Error Setup:", error.message));
 
             const unsubPayroll = onSnapshot(query(collection(db, "payroll"), where("companyName", "==", companyName)), (snapshot) => {
                 setPayroll(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
             }, (error) => console.log("Firebase Payroll Error Setup:", error.message));
 
-            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName), orderBy("timestamp", "desc")), (snapshot) => {
-                setAttendance(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
+            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName)), (snapshot) => {
+                const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
+                setAttendance(attData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Attendance Error Setup:", error.message));
 
             const unsubTasks = onSnapshot(
                 role === "employer"
-                    ? query(collection(db, "tasks"), where("companyName", "==", companyName), orderBy("createdAt", "desc"))
-                    : query(collection(db, "tasks"), where("companyName", "==", companyName), where("assigneeEmails", "array-contains", user?.email), orderBy("createdAt", "desc")),
+                    ? query(collection(db, "tasks"), where("companyName", "==", companyName))
+                    : query(collection(db, "tasks"), where("companyName", "==", companyName), where("assigneeEmails", "array-contains", user?.email)),
                 (snapshot) => {
-                    setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+                    const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                    setTasks(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
                 }, (error) => console.log("Firebase Tasks Error Setup:", error.message));
 
             const unsubDocuments = onSnapshot(
@@ -259,8 +262,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument)));
                 }, (error) => console.log("Firebase Docs Error Setup:", error.message));
 
-            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), where("companyName", "==", companyName), orderBy("timestamp", "desc")), (snapshot) => {
-                setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificationItem)));
+            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), where("companyName", "==", companyName)), (snapshot) => {
+                const nData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificationItem));
+                setNotifications(nData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Notifications Error Setup:", error.message));
 
 
@@ -272,16 +276,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     setLeaveBalances(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveBalance)));
                 }, (error) => console.log("Firebase Balances Error Setup:", error.message));
 
-            const unsubJobs = onSnapshot(query(collection(db, "jobs"), where("companyName", "==", companyName), orderBy("postedAt", "desc")), (snapshot) => {
-                setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+            const unsubJobs = onSnapshot(query(collection(db, "jobs"), where("companyName", "==", companyName)), (snapshot) => {
+                const jData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job));
+                setJobs(jData.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()));
             }, (error) => console.log("Firebase Jobs Error Setup:", error.message));
 
-            const unsubTeams = onSnapshot(query(collection(db, "teams"), where("companyName", "==", companyName), orderBy("createdAt", "desc")), (snapshot) => {
-                setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team)));
+            const unsubTeams = onSnapshot(query(collection(db, "teams"), where("companyName", "==", companyName)), (snapshot) => {
+                const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+                setTeams(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             }, (error) => console.log("Firebase Teams Error Setup:", error.message));
 
-            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), where("companyName", "==", companyName), orderBy("timestamp", "asc")), (snapshot) => {
-                setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage)));
+            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), where("companyName", "==", companyName)), (snapshot) => {
+                const cData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
+                setChatMessages(cData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
             }, (error) => console.log("Firebase Chat Error Setup:", error.message));
 
             const unsubDocTemplates = onSnapshot(query(collection(db, "doc_templates"), where("companyName", "==", companyName)), (snapshot) => {
@@ -321,8 +328,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 (error) => console.log("Firebase ChatReads Error:", error.message)
             );
 
-            const unsubscribeProfileUpdates = onSnapshot(query(collection(db, "profile_updates"), where("companyName", "==", companyName), orderBy("requestedAt", "desc")), (snapshot) => {
-                setProfileUpdates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfileUpdateRequest)));
+            const unsubscribeProfileUpdates = onSnapshot(query(collection(db, "profile_updates"), where("companyName", "==", companyName)), (snapshot) => {
+                const pData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfileUpdateRequest));
+                setProfileUpdates(pData.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
             }, (error) => console.log("Firebase ProfileUpdates Setup Error:", error.message));
 
             // Payslip Requests
