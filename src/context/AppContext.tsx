@@ -1020,10 +1020,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!leave) return;
 
         const deduction = leave.days || 1;
-        const balanceRecord = leaveBalances.find(b => b.empEmail === leave.empEmail && b.type === leave.type);
+        const targetType = leave.type === "Half Day Leave" ? "Casual Leave" : leave.type;
+        const balanceRecord = leaveBalances.find(b => b.empEmail === leave.empEmail && b.type === targetType);
 
         if (!balanceRecord || balanceRecord.balance < deduction) {
-            toast.error("Insufficient Balance", { description: `Employee only has ${balanceRecord?.balance || 0} days remaining for ${leave.type}.` });
+            toast.error("Insufficient Balance", { description: `Employee only has ${balanceRecord?.balance || 0} days remaining for ${targetType}.` });
             return;
         }
 

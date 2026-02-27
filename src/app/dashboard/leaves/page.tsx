@@ -395,7 +395,8 @@ export default function LeavesPage() {
                                                     <p className="text-sm text-indigo-800 font-medium">
                                                         This request will deduct <strong>{previewDays} day{previewDays !== 1 ? "s" : ""}</strong> from your leave balance
                                                         {(() => {
-                                                            const currentBal = myBalances.find(b => b.type === leaveType)?.balance ?? 0;
+                                                            const targetType = leaveType === "Half Day Leave" ? "Casual Leave" : leaveType;
+                                                            const currentBal = myBalances.find(b => b.type === targetType)?.balance ?? 0;
                                                             return <> &nbsp;(remaining after: <strong>{Math.max(0, currentBal - previewDays)} days</strong>)</>;
                                                         })()}
                                                     </p>
