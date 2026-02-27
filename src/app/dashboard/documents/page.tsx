@@ -90,10 +90,10 @@ export default function EmployeeDocumentsPage() {
     };
 
     const filteredDocs = documents.filter(doc => {
-        const empName = getEmployeeName(doc.empEmail).toLowerCase();
-        const matchesSearch = doc.empEmail.toLowerCase().includes(search.toLowerCase()) ||
+        const empName = (getEmployeeName(doc.empEmail) || "").toLowerCase();
+        const matchesSearch = (doc.empEmail || "").toLowerCase().includes(search.toLowerCase()) ||
             empName.includes(search.toLowerCase()) ||
-            doc.title.toLowerCase().includes(search.toLowerCase());
+            (doc.title || "").toLowerCase().includes(search.toLowerCase());
         const matchesType = selectedDocType === "all" || doc.title === selectedDocType;
         return matchesSearch && matchesType;
     });
@@ -230,7 +230,7 @@ export default function EmployeeDocumentsPage() {
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm">
-                                            {emp.name[0].toUpperCase()}
+                                            {(emp.name?.[0] || "?").toUpperCase()}
                                         </div>
                                         <div>
                                             <p className="font-bold text-slate-900 text-sm leading-tight">{emp.name}</p>
@@ -346,7 +346,7 @@ export default function EmployeeDocumentsPage() {
                                             <td className="px-4 sm:px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">
-                                                        {getEmployeeName(doc.empEmail)[0]?.toUpperCase()}
+                                                        {(getEmployeeName(doc.empEmail)?.[0] || "?").toUpperCase()}
                                                     </div>
                                                     <div className="flex flex-col">
                                                         <span className="font-bold text-slate-900 leading-none">{getEmployeeName(doc.empEmail)}</span>

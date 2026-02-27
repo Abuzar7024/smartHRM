@@ -146,8 +146,8 @@ export default function HierarchyPage() {
                                 <div className="border-t border-slate-100 divide-y divide-slate-50">
                                     {emps.map(emp => (
                                         <div key={emp.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                                            <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                                                {emp.name.charAt(0).toUpperCase()}
+                                            <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm mx-auto shadow-md ring-4 ring-white">
+                                                {(emp.name || "?").charAt(0).toUpperCase()}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-semibold text-slate-900 truncate">{emp.name}</p>
@@ -182,8 +182,8 @@ export default function HierarchyPage() {
                     <div className="space-y-2">
                         {employees.map(emp => (
                             <div key={emp.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                                    {emp.name.charAt(0)}
+                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs flex-shrink-0 uppercase">
+                                    {(emp.name || "?").charAt(0)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold text-slate-900 truncate">{emp.name}</p>

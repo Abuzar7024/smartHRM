@@ -168,7 +168,7 @@ export default function TeamsPage() {
                                                         {selectedMembers.includes(e.email) && <Check className="w-3 h-3 text-white" />}
                                                     </div>
                                                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 text-xs flex-shrink-0">
-                                                        {e.name.charAt(0)}
+                                                        {(e.name || "?").charAt(0)}
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-semibold text-slate-800">{e.name}</p>
@@ -237,7 +237,7 @@ export default function TeamsPage() {
                                                 {selectedMembers.includes(e.email) && <Check className="w-3 h-3 text-white" />}
                                             </div>
                                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 text-xs flex-shrink-0">
-                                                {e.name.charAt(0)}
+                                                {(e.name || "?").charAt(0)}
                                             </div>
                                             <div>
                                                 <p className="text-sm font-semibold text-slate-800">{e.name}</p>
@@ -326,7 +326,7 @@ export default function TeamsPage() {
                                 {/* Leader */}
                                 <div className="flex items-center gap-2.5 mb-4 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100">
                                     <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm uppercase flex-shrink-0">
-                                        {(leader?.name || team.leaderEmail).charAt(0)}
+                                        {String(leader?.name || team.leaderEmail || "?").charAt(0)}
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-none mb-0.5">Team Leader</p>
@@ -346,7 +346,7 @@ export default function TeamsPage() {
                                                 <div key={idx} className="flex items-center justify-between px-2.5 py-2 rounded-md bg-slate-50 border border-slate-100 hover:bg-white transition-colors">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 flex-shrink-0">
-                                                            {(member?.name || email).charAt(0).toUpperCase()}
+                                                            {String(member?.name || email || "?").charAt(0).toUpperCase()}
                                                         </div>
                                                         <span className="text-sm font-medium text-slate-700">{member?.name || email}</span>
                                                     </div>

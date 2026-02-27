@@ -29,8 +29,13 @@ export async function POST(req: Request) {
             key_secret: process.env.RAZORPAY_KEY_SECRET!,
         });
 
-        // Amount in paise (e.g. 5 employees * 99 INR * 100 paise)
-        const amount = employeesToAdd * 99 * 100;
+        const subtotal = employeesToAdd * 99;
+        const platformFee = 15;
+        const processingFee = Math.ceil((subtotal + platformFee) * 0.02);
+        const finalAmount = subtotal + platformFee + processingFee;
+
+        // Amount in paise
+        const amount = finalAmount * 100;
         const receipt = `rcpt_${randomUUID().slice(0, 8)}`;
 
         const options = {

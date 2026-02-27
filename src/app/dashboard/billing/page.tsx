@@ -101,7 +101,7 @@ export default function BillingPage() {
 
     const handleUpgrade = async () => {
         if (seatsToAdd < 1) return toast.error("Please enter a valid number of seats.");
-        
+
         setUpgradeLoading(true);
         try {
             const loaded = await loadRazorpayScript();
@@ -221,7 +221,7 @@ export default function BillingPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-                
+
                 {/* Status KPI Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card className="border-slate-200 shadow-sm rounded-2xl bg-white">
@@ -289,11 +289,25 @@ export default function BillingPage() {
                                             />
                                         </div>
                                     </div>
-                                    
-                                    <div className="flex flex-col md:flex-row items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-200">
-                                        <div className="text-center md:text-left mb-4 md:mb-0">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Invoice Total</p>
-                                            <p className="text-3xl font-black text-slate-900">₹{seatsToAdd * 99 || 0}</p>
+
+                                    {/* Fee Breakdown */}
+                                    <div className="flex flex-col p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                                        <div className="flex justify-between items-center text-sm font-medium text-slate-600">
+                                            <span>Subtotal ({seatsToAdd} seats @ ₹99)</span>
+                                            <span>₹{seatsToAdd * 99}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm font-medium text-slate-600">
+                                            <span>Platform Fee</span>
+                                            <span>₹15</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm font-medium text-slate-600">
+                                            <span>Processing Fee (2%)</span>
+                                            <span>₹{Math.ceil(((seatsToAdd * 99) + 15) * 0.02)}</span>
+                                        </div>
+                                        <div className="h-px bg-slate-200 my-1 w-full" />
+                                        <div className="flex justify-between items-center text-lg font-black text-slate-900 mt-2">
+                                            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Invoice Total</span>
+                                            <span>₹{(seatsToAdd * 99) + 15 + Math.ceil(((seatsToAdd * 99) + 15) * 0.02)}</span>
                                         </div>
                                     </div>
 
@@ -308,7 +322,7 @@ export default function BillingPage() {
                                             "Procesor Payment"
                                         )}
                                     </Button>
-                                    
+
                                     <div className="text-center mt-4 text-[10px] uppercase font-bold text-slate-400 flex items-center justify-center gap-1.5">
                                         <Lock className="w-3 h-3 text-slate-300" />
                                         End-to-End SSL Encrypted
@@ -355,7 +369,7 @@ export default function BillingPage() {
                                             payments.map((p) => (
                                                 <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <TableCell className="px-6 py-4">
-                                                        <span className="font-mono text-xs text-slate-600 font-medium">#{p.transactionId?.slice(0,12) || "TRX_N/A"}</span>
+                                                        <span className="font-mono text-xs text-slate-600 font-medium">#{p.transactionId?.slice(0, 12) || "TRX_N/A"}</span>
                                                     </TableCell>
                                                     <TableCell className="px-6 py-4 font-bold text-slate-900">
                                                         ₹{(p.amount / 100).toFixed(2)}

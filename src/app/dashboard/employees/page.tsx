@@ -118,9 +118,9 @@ export default function EmployeesPage() {
     }
 
     const filtered = employees.filter(emp =>
-        (emp.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-        (emp.department?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-        (emp.email?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+        (emp.name?.toLowerCase() || "").includes((searchTerm || "").toLowerCase()) ||
+        (emp.department?.toLowerCase() || "").includes((searchTerm || "").toLowerCase()) ||
+        (emp.email?.toLowerCase() || "").includes((searchTerm || "").toLowerCase())
     );
 
 
@@ -431,7 +431,7 @@ export default function EmployeesPage() {
                                     <TableCell className="py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600">
-                                                {(emp.name || emp.email || "U")[0].toUpperCase()}
+                                                {((emp.name || emp.email || "U")?.[0] || "U").toUpperCase()}
                                             </div>
                                             <div>
                                                 <div className="font-semibold text-slate-900">{emp.name || "Unnamed"}</div>
