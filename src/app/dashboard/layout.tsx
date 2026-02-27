@@ -13,6 +13,7 @@ import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils"; // Assuming this path for cn utility
 import { motion, AnimatePresence } from "framer-motion"; // For animation
+import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 
 export default function DashboardLayout({
     children,
@@ -468,6 +469,7 @@ export default function DashboardLayout({
                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10">
                     <div className="mx-auto w-full max-w-7xl">{children}</div>
                 </main>
+                <AnnouncementPopup />
             </div>
         </div>
     );

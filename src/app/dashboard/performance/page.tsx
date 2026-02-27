@@ -169,7 +169,7 @@ export default function PerformancePage() {
                                             "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm",
                                             analyzingId === emp.id ? "bg-white/10 border-white/20" : "bg-white border-slate-200 text-slate-600"
                                         )}>
-                                            {emp.name[0].toUpperCase()}
+                                            {((emp.name || emp.email)?.[0] || "?").toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="text-sm font-bold truncate max-w-[140px]">{emp.name}</div>
@@ -336,6 +336,6 @@ export default function PerformancePage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     );
 }

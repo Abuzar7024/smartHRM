@@ -329,89 +329,87 @@ export default function EmployeeDocumentsPage() {
                             <p className="text-xs mt-1 font-medium">Use the "Request Documents" button above to request files from employees.</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-[0.2em] font-black">
+                        <div>
+                            <table className="w-full text-left text-sm table-fixed">
+                                <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-[0.1em] font-black">
                                     <tr>
-                                        <th className="px-4 sm:px-6 py-4">Personnel</th>
-                                        <th className="px-4 sm:px-6 py-4">Document Title</th>
-                                        <th className="px-4 sm:px-6 py-4">Status</th>
-                                        <th className="px-4 sm:px-6 py-4">Date</th>
-                                        <th className="px-4 sm:px-6 py-4 text-right">Actions</th>
+                                        <th className="px-3 py-3 w-[25%]">Personnel</th>
+                                        <th className="px-3 py-3 w-[25%]">Document Title</th>
+                                        <th className="px-3 py-3 w-[15%]">Status</th>
+                                        <th className="px-3 py-3 w-[15%] text-center">Date</th>
+                                        <th className="px-3 py-3 w-[20%] text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredDocs.map(doc => (
                                         <tr key={doc.id} className="hover:bg-slate-50/30 transition-colors group">
-                                            <td className="px-4 sm:px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">
+                                            <td className="px-3 py-4 overflow-hidden">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400 border border-slate-200 flex-shrink-0">
                                                         {(getEmployeeName(doc.empEmail)?.[0] || "?").toUpperCase()}
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-slate-900 leading-none">{getEmployeeName(doc.empEmail)}</span>
-                                                        <span className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{doc.empEmail}</span>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="font-bold text-slate-900 leading-none truncate text-xs">{getEmployeeName(doc.empEmail)}</span>
+                                                        <span className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tight truncate">{doc.empEmail}</span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 font-bold text-slate-700">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm">
-                                                        <FileText className="w-3.5 h-3.5" />
+                                            <td className="px-3 py-4 font-bold text-slate-700">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm flex-shrink-0">
+                                                        <FileText className="w-3 h-3" />
                                                     </div>
-                                                    {doc.title}
+                                                    <span className="truncate text-xs">{doc.title}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4">
-                                                {doc.status === "Approved" ? (
-                                                    <Badge variant="success" className="bg-emerald-500/10 text-emerald-600 border-none px-3 py-1 font-bold text-[10px]">VERIFIED</Badge>
-                                                ) : doc.status === "Rejected" ? (
-                                                    <Badge variant="destructive" className="bg-rose-500/10 text-rose-600 border-none px-3 py-1 font-bold text-[10px]">REJECTED</Badge>
-                                                ) : doc.status === "Uploaded" ? (
-                                                    <Badge variant="warning" className="bg-blue-500/10 text-blue-600 border-none px-3 py-1 font-bold text-[10px]">PENDING REVIEW</Badge>
-                                                ) : (
-                                                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-none px-3 py-1 font-bold text-[10px]">AWAITING UPLOAD</Badge>
-                                                )}
+                                            <td className="px-3 py-4 whitespace-nowrap">
+                                                <Badge
+                                                    variant={doc.status === "Approved" ? "success" : doc.status === "Rejected" ? "destructive" : doc.status === "Uploaded" ? "warning" : "secondary"}
+                                                    className={cn(
+                                                        "border-none px-2 py-0.5 font-bold text-[9px] whitespace-nowrap",
+                                                        doc.status === "Approved" ? "bg-emerald-500/10 text-emerald-600" :
+                                                            doc.status === "Rejected" ? "bg-rose-500/10 text-rose-600" :
+                                                                doc.status === "Uploaded" ? "bg-blue-500/10 text-blue-600" :
+                                                                    "bg-amber-500/10 text-amber-600"
+                                                    )}
+                                                >
+                                                    {doc.status === "Approved" ? "VERIFIED" : doc.status === "Rejected" ? "REJECTED" : doc.status === "Uploaded" ? "PENDING" : "AWAITING"}
+                                                </Badge>
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 text-slate-500 font-bold text-xs uppercase tracking-tighter">
+                                            <td className="px-3 py-4 text-slate-500 font-bold text-[10px] uppercase tracking-tighter whitespace-nowrap text-center">
                                                 {doc.requestedAt ? new Date(doc.requestedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "---"}
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {/* View/Preview button - shown when file exists */}
+                                            <td className="px-3 py-4 text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1">
                                                     {doc.url && (
                                                         <Button
                                                             onClick={() => setPreviewDoc({ url: doc.url!, title: doc.title, empEmail: doc.empEmail })}
                                                             size="sm"
                                                             variant="outline"
-                                                            className="h-8 text-[10px] font-bold rounded-lg border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                                            className="h-7 text-[9px] font-bold rounded-lg border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-2"
                                                         >
-                                                            <Eye className="w-3.5 h-3.5 mr-1" /> View
+                                                            <Eye className="w-3 h-3 mr-1" /> View
                                                         </Button>
                                                     )}
-
-                                                    {/* Approve/Reject - shown when uploaded */}
                                                     {doc.status === "Uploaded" && (
                                                         <>
                                                             <Button
                                                                 onClick={() => handleApprove(doc.id!)}
                                                                 size="sm"
-                                                                className="h-8 text-[10px] font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                                                                className="h-7 text-[9px] font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-2"
                                                             >
-                                                                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                                                                <CheckCircle className="w-3 h-3 mr-1" /> Approve
                                                             </Button>
                                                             <Button
                                                                 onClick={() => handleReject(doc.id!)}
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="h-8 text-[10px] font-bold rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50"
+                                                                className="h-7 text-[9px] font-bold rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 px-2"
                                                             >
-                                                                <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                                                                <XCircle className="w-3 h-3 mr-1" /> Reject
                                                             </Button>
                                                         </>
                                                     )}
-
-                                                    {/* Reminder - shown when pending */}
                                                     {doc.status === "Pending" && (
                                                         <Button
                                                             onClick={() => {
@@ -420,20 +418,18 @@ export default function EmployeeDocumentsPage() {
                                                             }}
                                                             size="sm"
                                                             variant="outline"
-                                                            className="h-8 text-[10px] font-bold rounded-lg border-amber-200 text-amber-600 hover:bg-amber-50"
+                                                            className="h-7 text-[9px] font-bold rounded-lg border-amber-200 text-amber-600 hover:bg-amber-50 px-2"
                                                         >
-                                                            <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Remind
+                                                            <AlertTriangle className="w-3 h-3 mr-1" /> Remind
                                                         </Button>
                                                     )}
-
-                                                    {/* Download for approved */}
                                                     {doc.status === "Approved" && doc.url && (
                                                         <a
                                                             href={doc.url}
                                                             download={`${doc.title}_${getEmployeeName(doc.empEmail)}`}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-all"
+                                                            className="inline-flex items-center gap-1 px-2 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-all"
                                                         >
-                                                            <Download className="w-3 h-3" /> Save
+                                                            <Download className="w-2.5 h-2.5" /> Save
                                                         </a>
                                                     )}
                                                 </div>

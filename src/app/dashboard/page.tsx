@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle, AlertTriangle } from "lucide-react";
+import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle, AlertTriangle, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -15,10 +15,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
+import { useRouter } from "next/navigation";
+
 export default function DashboardOverview() {
+    const router = useRouter();
     const [accepting, setAccepting] = useState(false);
     const { role, user, status } = useAuth();
-    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate } = useApp();
+    const { attendance, clockIn, clockOut, takeBreak, endBreak, employees, tasks, leaves, documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus, docTemplates, addDocTemplate, deleteDocTemplate, announcements } = useApp();
 
     const [docTitle, setDocTitle] = useState("");
     const [docRequired, setDocRequired] = useState(false);
@@ -354,7 +357,7 @@ export default function DashboardOverview() {
                                     <div key={doc.id} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-4 py-3 gap-3">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center font-bold text-rose-600 text-xs flex-shrink-0">
-                                                {(emp?.name || doc.empEmail).charAt(0).toUpperCase()}
+                                                {(emp?.name || doc.empEmail || "?").charAt(0).toUpperCase()}
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-slate-900 truncate">
@@ -396,6 +399,7 @@ export default function DashboardOverview() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: Attendance + Employees */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* 2. Attendance Logs */}
                     <Card className="shadow-sm">
                         <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
                             <CardTitle className="text-base font-semibold">Recent Attendance Logs</CardTitle>
@@ -453,7 +457,7 @@ export default function DashboardOverview() {
                                         <div key={emp.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 text-xs">
-                                                    {(emp.name || emp.email || "U").charAt(0).toUpperCase()}
+                                                    {((emp.name || emp.email || "U")?.[0] || "U").toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <p className="font-semibold text-slate-900 text-sm leading-tight">{emp.name || "Unnamed"}</p>
@@ -474,8 +478,9 @@ export default function DashboardOverview() {
                     )}
                 </div>
 
-                {/* Right: Priority Tasks + Documents */}
+                {/* Right: Announcements + Priority Tasks + Documents */}
                 <div className="space-y-6">
+
                     <Card className="shadow-sm">
                         <CardHeader className="p-5 border-b border-slate-100">
                             <CardTitle className="text-base font-semibold">Priority Tasks</CardTitle>
@@ -511,119 +516,6 @@ export default function DashboardOverview() {
                             <CardTitle className="text-base font-semibold">Onboarding Documents</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
-                            {role === "employer" && (
-                                <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm relative">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
-                                            <FileText className="w-3.5 h-3.5" /> Request Form
-                                        </p>
-                                        <Dialog open={isManageDocsOpen} onOpenChange={setIsManageDocsOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-slate-400 hover:text-primary">
-                                                    <Settings className="w-3.5 h-3.5" />
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Document Templates</DialogTitle>
-                                                    <DialogDescription>Add or remove required onboarding document types.</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-4 py-3">
-                                                    <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50 max-h-[250px] overflow-y-auto">
-                                                        {docTemplates.map(tpl => (
-                                                            <div key={tpl.id} className="flex items-center justify-between bg-white p-2 border rounded-md shadow-sm">
-                                                                <div>
-                                                                    <p className="text-sm font-semibold">{tpl.title}</p>
-                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? "Mandatory" : "Optional"}</p>
-                                                                </div>
-                                                                <Button variant="ghost" size="icon-sm" onClick={() => deleteDocTemplate(tpl.id!)} className="text-rose-500 h-6 w-6">
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </Button>
-                                                            </div>
-                                                        ))}
-                                                        {docTemplates.length === 0 && <p className="text-xs text-slate-500 italic">No document types available.</p>}
-                                                    </div>
-                                                    <div className="space-y-2 pt-2 border-t">
-                                                        <Label className="text-xs font-bold">Add Document Type</Label>
-                                                        <Input placeholder="e.g. 2024 W2 Tax Form" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm" />
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-primary" />
-                                                            <Label htmlFor="reqDoc" className="text-xs">Is this document mandatory?</Label>
-                                                        </div>
-                                                        <Button
-                                                            variant="corporate"
-                                                            className="w-full mt-2 h-9 text-xs"
-                                                            onClick={() => {
-                                                                if (docTitle.trim()) {
-                                                                    addDocTemplate(docTitle.trim(), docRequired);
-                                                                    setDocTitle("");
-                                                                    setDocRequired(false);
-                                                                    toast.success("Template Added!");
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Type
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                    <select
-                                        className="w-full text-sm p-2 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
-                                        value={docEmpEmail}
-                                        onChange={e => setDocEmpEmail(e.target.value)}
-                                    >
-                                        <option value="">Select Employee File</option>
-                                        {employees.map(e => <option key={e.id} value={e.email}>{e.name} ({e.email})</option>)}
-                                    </select>
-                                    <div className="space-y-2 max-h-[160px] overflow-y-auto p-2 border border-slate-100 rounded-md bg-white">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Select Documents to Request:</p>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {docTemplates.map(d => (
-                                                <label key={d.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                        checked={selectedDocTitles.includes(d.title)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedDocTitles([...selectedDocTitles, d.title]);
-                                                            } else {
-                                                                setSelectedDocTitles(selectedDocTitles.filter(t => t !== d.title));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span className="text-xs font-medium text-slate-700">
-                                                        {d.title} {d.required && <span className="text-rose-500">*</span>}
-                                                    </span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold"
-                                        disabled={!docEmpEmail || selectedDocTitles.length === 0}
-                                        onClick={async () => {
-                                            if (docEmpEmail && selectedDocTitles.length > 0) {
-                                                try {
-                                                    await requestMultipleDocuments(docEmpEmail, selectedDocTitles);
-                                                    toast.success("Request Executed", { description: `${selectedDocTitles.length} documents requested formally.` });
-                                                    setSelectedDocTitles([]);
-                                                } catch {
-                                                    toast.error("Transmission Error", { description: "Unable to request documents at this time." });
-                                                }
-                                            } else {
-                                                toast.error("Form Incomplete", { description: "Please select an employee and at least one document template." });
-                                            }
-                                        }}
-                                    >
-                                        Issue Request ({selectedDocTitles.length})
-                                    </Button>
-                                </div>
-                            )}
-
                             <div className="space-y-3">
                                 {(role === "employer" ? documents : documents.filter(d => d.empEmail === user?.email)).map(doc => (
                                     <div key={doc.id} className="flex flex-col gap-2 p-3 border border-slate-100 rounded-lg">
@@ -675,8 +567,8 @@ export default function DashboardOverview() {
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }

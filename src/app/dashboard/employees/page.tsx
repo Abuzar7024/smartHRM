@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle, Lock, Settings } from "lucide-react";
+import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle, Lock, Settings, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,11 @@ export default function EmployeesPage() {
     const [empPosition, setEmpPosition] = useState("");
     const [empDept, setEmpDept] = useState("");
     const [empPassword, setEmpPassword] = useState("");
+    const [ctc, setCtc] = useState("");
+    const [pf, setPf] = useState("");
+    const [tds, setTds] = useState("");
+    const [insuranceOpted, setInsuranceOpted] = useState(false);
+    const [insuranceAmount, setInsuranceAmount] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -141,7 +146,12 @@ export default function EmployeesPage() {
                     password: empPassword,
                     role: empRole || "Staff",
                     position: empPosition || "Staff",
-                    department: empDept || "General"
+                    department: empDept || "General",
+                    ctc,
+                    pf,
+                    tds,
+                    insuranceOpted,
+                    insuranceAmount: insuranceOpted ? insuranceAmount : ""
                 }),
             });
 
@@ -290,86 +300,82 @@ export default function EmployeesPage() {
                                     </div>
 
                                     {/* Onboarding Documents Field */}
-                                    <div className="space-y-1.5 lg:col-span-3">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                            <Label className="text-xs font-bold text-slate-500 uppercase">Required Onboarding Documents</Label>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 text-[10px] text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 uppercase font-bold tracking-widest rounded-lg"
-                                                onClick={() => setIsManageDocsOpen(true)}
-                                            >
-                                                <Settings className="w-3 h-3 mr-1" /> Manage Templates
-                                            </Button>
+                                    <div className="md:col-span-2 lg:col-span-3 space-y-4 pt-6 border-t mt-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <Label className="text-sm font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                                <CreditCard className="w-4 h-4 text-indigo-600" /> Compensation Details
+                                            </Label>
+                                            <Badge variant="outline" className="text-[10px] font-bold bg-indigo-50 border-indigo-100 text-indigo-700">Financial Setup</Badge>
                                         </div>
 
-                                        <Dialog open={isManageDocsOpen} onOpenChange={setIsManageDocsOpen}>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Document Templates</DialogTitle>
-                                                    <DialogDescription>Define standard files that need to be requested during onboarding.</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-4 py-3">
-                                                    <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50 max-h-[250px] overflow-y-auto">
-                                                        {docTemplates.map(tpl => (
-                                                            <div key={tpl.id} className="flex items-center justify-between bg-white p-2 border rounded-md shadow-sm">
-                                                                <div>
-                                                                    <p className="text-sm font-semibold">{tpl.title}</p>
-                                                                    <p className="text-[10px] text-slate-500 uppercase font-bold">{tpl.required ? "Mandatory" : "Optional"}</p>
-                                                                </div>
-                                                                <Button type="button" variant="ghost" size="sm" onClick={() => deleteDocTemplate(tpl.id!)} className="text-rose-500 hover:bg-rose-50 h-8 w-8 p-0">
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
-                                                        ))}
-                                                        {docTemplates.length === 0 && <p className="text-xs text-slate-500 italic text-center py-4">No templates defined.</p>}
-                                                    </div>
-                                                    <div className="space-y-2 pt-2 border-t">
-                                                        <Label className="text-xs font-bold">Add Document Type</Label>
-                                                        <Input placeholder="e.g. 2024 W2 Tax Form or Offer Letter" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="h-9 text-sm rounded-lg" />
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <input type="checkbox" id="reqDoc" checked={docRequired} onChange={() => setDocRequired(!docRequired)} className="rounded border-slate-300 w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500" />
-                                                            <Label htmlFor="reqDoc" className="text-xs cursor-pointer">Is this document strictly mandatory?</Label>
-                                                        </div>
-                                                        <Button
-                                                            type="button"
-                                                            variant="corporate"
-                                                            className="w-full mt-2 h-9 text-xs rounded-lg mt-4 shadow-sm"
-                                                            onClick={() => {
-                                                                if (docTitle.trim()) {
-                                                                    addDocTemplate(docTitle.trim(), docRequired);
-                                                                    setDocTitle("");
-                                                                    setDocRequired(false);
-                                                                    toast.success("Template Added!");
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Plus className="w-3.5 h-3.5 mr-1" /> Create Template
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                                            {docTemplates.length === 0 ? (
-                                                <p className="text-xs text-slate-400 italic col-span-full">No document templates available to request.</p>
-                                            ) : (
-                                                docTemplates.map(doc => (
-                                                    <label key={doc.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-slate-200 shadow-sm cursor-pointer hover:border-slate-300">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                                                            checked={selectedDocsToReq.includes(doc.title)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) setSelectedDocsToReq(prev => [...prev, doc.title]);
-                                                                else setSelectedDocsToReq(prev => prev.filter(t => t !== doc.title));
-                                                            }}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-slate-600">Annual CTC (₹) *</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="e.g. 1200000"
+                                                    value={ctc}
+                                                    onChange={e => setCtc(e.target.value)}
+                                                    required
+                                                    className="rounded-lg h-10"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-slate-600">Monthly PF (₹)</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="e.g. 1800"
+                                                    value={pf}
+                                                    onChange={e => setPf(e.target.value)}
+                                                    className="rounded-lg h-10"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-slate-600">Monthly TDS (₹) *</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="e.g. 5000"
+                                                    value={tds}
+                                                    onChange={e => setTds(e.target.value)}
+                                                    required
+                                                    className="rounded-lg h-10"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold text-slate-600">Insurance</Label>
+                                                <div className="flex items-center gap-2 h-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="insOpt"
+                                                        checked={insuranceOpted}
+                                                        onChange={() => setInsuranceOpted(!insuranceOpted)}
+                                                        className="rounded border-slate-300 w-4 h-4 text-indigo-600"
+                                                    />
+                                                    <Label htmlFor="insOpt" className="text-xs cursor-pointer">Opted</Label>
+                                                    {insuranceOpted && (
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="Premium"
+                                                            value={insuranceAmount}
+                                                            onChange={e => setInsuranceAmount(e.target.value)}
+                                                            className="rounded-lg h-8 text-xs flex-1"
                                                         />
-                                                        <span className="font-medium text-slate-700">{doc.title} {doc.required && <span className="text-rose-500">*</span>}</span>
-                                                    </label>
-                                                ))
-                                            )}
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                                            <div>
+                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Estimated Monthly In-Hand</p>
+                                                <p className="text-2xl font-black text-slate-900">
+                                                    ₹{Number(ctc ? (Number(ctc) / 12) - Number(pf || 0) - Number(tds || 0) - (insuranceOpted ? Number(insuranceAmount || 0) : 0) : 0).toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="text-right text-[10px] text-slate-500 font-medium">
+                                                <p>Calculation: (CTC/12) - PF - TDS {insuranceOpted ? "- Insurance" : ""}</p>
+                                                <p className="mt-0.5 italic">subject to professional taxes & other deductions</p>
+                                            </div>
                                         </div>
                                     </div>
 

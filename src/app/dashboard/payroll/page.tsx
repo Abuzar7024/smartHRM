@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export default function PayrollPage() {
     const { role } = useAuth();
-    const { payroll, processPayroll } = useApp();
+    const { payroll, processPayroll, payslipRequests, fulfillPayslipRequest } = useApp();
 
     if (role !== "employer") {
         return (
@@ -66,68 +66,134 @@ export default function PayrollPage() {
                 ))}
             </div>
 
-            {/* ── Transaction History ── */}
-            <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
-                <CardHeader className="bg-slate-50/50 border-b p-5">
-                    <div>
-                        <CardTitle className="text-base font-bold">Transaction Registry</CardTitle>
-                        <CardDescription className="text-xs">Verification logs for all processed salary events.</CardDescription>
+            {/* ── Transaction History & Requests ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <Card className="xl:col-span-2 border-slate-200 shadow-sm rounded-xl overflow-hidden h-fit">
+                    <CardHeader className="bg-slate-50/50 border-b p-5">
+                        <div>
+                            <CardTitle className="text-base font-bold">Transaction Registry</CardTitle>
+                            <CardDescription className="text-xs">Verification logs for all processed salary events.</CardDescription>
+                        </div>
+                    </CardHeader>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
+                                    <TableHead className="h-10">TID / ID</TableHead>
+                                    <TableHead className="h-10">Beneficiary</TableHead>
+                                    <TableHead className="h-10">Net Amount</TableHead>
+                                    <TableHead className="h-10">Process Date</TableHead>
+                                    <TableHead className="h-10">Status</TableHead>
+                                    <TableHead className="h-10 text-right">Records</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {payroll.map((pr) => (
+                                    <TableRow key={pr.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                        <TableCell className="py-4 text-[10px] font-bold text-slate-400 font-mono">
+                                            {pr.transactionId || pr.id?.slice(-8).toUpperCase()}
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                            <div className="font-semibold text-slate-900">{pr.name}</div>
+                                            <div className="text-[11px] text-slate-500">{pr.department}</div>
+                                        </TableCell>
+                                        <TableCell className="py-4 font-bold text-slate-900">
+                                            {pr.amount}
+                                        </TableCell>
+                                        <TableCell className="py-4 text-xs font-medium text-slate-500">
+                                            {pr.date}
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                            <Badge variant={pr.status === "Paid" ? "success" : "warning"} className="rounded-md font-bold text-[10px] h-5 px-2">
+                                                {pr.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-4 text-right">
+                                            <Button variant="ghost" size="icon-sm" className="text-slate-400 hover:text-primary rounded-lg">
+                                                <Download className="w-4 h-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {payroll.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-20 text-slate-400">
+                                            <div className="flex flex-col items-center gap-2 opacity-30">
+                                                <CreditCard className="w-8 h-8" />
+                                                <p className="text-sm font-medium">No payroll history found. Execute a Salary Run to begin.</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
-                </CardHeader>
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
-                                <TableHead className="h-10">TID / ID</TableHead>
-                                <TableHead className="h-10">Beneficiary</TableHead>
-                                <TableHead className="h-10">Net Amount</TableHead>
-                                <TableHead className="h-10">Process Date</TableHead>
-                                <TableHead className="h-10">Status</TableHead>
-                                <TableHead className="h-10 text-right">Records</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {payroll.map((pr) => (
-                                <TableRow key={pr.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                                    <TableCell className="py-4 text-[10px] font-bold text-slate-400 font-mono">
-                                        {pr.transactionId || pr.id?.slice(-8).toUpperCase()}
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                        <div className="font-semibold text-slate-900">{pr.name}</div>
-                                        <div className="text-[11px] text-slate-500">{pr.department}</div>
-                                    </TableCell>
-                                    <TableCell className="py-4 font-bold text-slate-900">
-                                        {pr.amount}
-                                    </TableCell>
-                                    <TableCell className="py-4 text-xs font-medium text-slate-500">
-                                        {pr.date}
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                        <Badge variant={pr.status === "Paid" ? "success" : "warning"} className="rounded-md font-bold text-[10px] h-5 px-2">
-                                            {pr.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="py-4 text-right">
-                                        <Button variant="ghost" size="icon-sm" className="text-slate-400 hover:text-primary rounded-lg">
-                                            <Download className="w-4 h-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {payroll.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-20 text-slate-400">
-                                        <div className="flex flex-col items-center gap-2 opacity-30">
-                                            <CreditCard className="w-8 h-8" />
-                                            <p className="text-sm font-medium">No payroll history found. Execute a Salary Run to begin.</p>
+                </Card>
+
+                {/* ── Payslip Requests Section ── */}
+                <Card className="xl:col-span-1 border-slate-200 shadow-sm rounded-xl bg-white h-fit">
+                    <CardHeader className="bg-slate-50/50 border-b p-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-base font-bold">Service Requests</CardTitle>
+                                <CardDescription className="text-xs">Employee requests for payslips/documents.</CardDescription>
+                            </div>
+                            <Badge className="bg-rose-50 text-rose-600 border-rose-100 font-bold">
+                                {payslipRequests.filter(r => r.status === "Pending").length} NEW
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                            {payslipRequests.length === 0 ? (
+                                <div className="p-12 text-center text-slate-400">
+                                    <IndianRupee className="w-8 h-8 mx-auto opacity-20 mb-3" />
+                                    <p className="text-sm font-semibold">No pending requests</p>
+                                    <p className="text-[10px] uppercase">All employee inquiries resolved.</p>
+                                </div>
+                            ) : (
+                                payslipRequests.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()).map((req) => (
+                                    <div key={req.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 text-[10px] flex-shrink-0">
+                                                    {(req.empName?.[0] || "?").toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-900">{req.empName}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">{req.empEmail}</p>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 bg-indigo-50 border-indigo-100 text-indigo-700">
+                                                            {req.month}
+                                                        </Badge>
+                                                        <span className="text-[9px] text-slate-400 font-medium">
+                                                            {new Date(req.requestedAt).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {req.status === "Pending" ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="corporate"
+                                                    className="h-8 text-[10px] px-3 font-bold"
+                                                    onClick={() => fulfillPayslipRequest(req.id!, req.empEmail)}
+                                                >
+                                                    Send Payslip
+                                                </Button>
+                                            ) : (
+                                                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold text-[9px]">
+                                                    FULFILLED
+                                                </Badge>
+                                            )}
                                         </div>
-                                    </TableCell>
-                                </TableRow>
+                                    </div>
+                                ))
                             )}
-                        </TableBody>
-                    </Table>
-                </div>
-            </Card>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }

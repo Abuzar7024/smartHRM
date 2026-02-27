@@ -26,7 +26,8 @@ import {
     FileText,
     UserPlus,
     Wallet,
-    FileCog
+    FileCog,
+    Megaphone
 } from "lucide-react";
 import { useState } from "react";
 
@@ -63,7 +64,6 @@ export function Sidebar() {
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
-        { name: "Recruitment", href: "/dashboard/recruitment", icon: Briefcase },
         { name: "Billing", href: "/dashboard/billing", icon: Wallet },
     ];
 

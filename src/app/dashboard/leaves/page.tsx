@@ -38,7 +38,7 @@ function LeaveTypeBadge({ type, isHalfDay }: { type: string; isHalfDay?: boolean
 
 export default function LeavesPage() {
     const { role, user } = useAuth();
-    const { employees, leaves, requestLeave, updateLeaveStatus, leaveBalances, addLeaveBalance, updateLeaveBalance, deleteLeaveBalance, approveLeaveRequest, rejectLeaveRequest } = useApp();
+    const { employees, leaves, requestLeave, updateLeaveStatus, leaveBalances, addLeaveBalance, bulkAddLeaveBalances, updateLeaveBalance, deleteLeaveBalance, approveLeaveRequest, rejectLeaveRequest } = useApp();
 
     const [showForm, setShowForm] = useState(false);
     const [selectedEmpEmail, setSelectedEmpEmail] = useState("");
@@ -47,7 +47,13 @@ export default function LeavesPage() {
     const [leaveFrom, setLeaveFrom] = useState("");
     const [leaveTo, setLeaveTo] = useState("");
     const [leaveDescription, setLeaveDescription] = useState("");
-    const [leaveDaysAllocation, setLeaveDaysAllocation] = useState(0);
+
+    // Employer multi-allocation state
+    const [sickAllocation, setSickAllocation] = useState(0);
+    const [annualAllocation, setAnnualAllocation] = useState(0);
+    const [casualAllocation, setCasualAllocation] = useState(0);
+    const [otherAllocation, setOtherAllocation] = useState(0);
+
     const [leaveTypeFilter, setLeaveTypeFilter] = useState("All");
     const [viewMode, setViewMode] = useState<"Requests" | "Balances">("Requests");
 
@@ -70,15 +76,28 @@ export default function LeavesPage() {
         e.preventDefault();
 
         if (role === "employer") {
-            if (!selectedEmpEmail || leaveDaysAllocation <= 0) return;
-            await addLeaveBalance({
-                empEmail: selectedEmpEmail,
-                balance: leaveDaysAllocation,
-                type: leaveType
-            });
+            if (!selectedEmpEmail) return;
+            const total = sickAllocation + annualAllocation + casualAllocation + otherAllocation;
+            if (total <= 0) {
+                toast.error("Allocation Required", { description: "Please allocate at least one day of leave." });
+                return;
+            }
+
+            const balances = [];
+            if (sickAllocation > 0) balances.push({ empEmail: selectedEmpEmail, balance: sickAllocation, type: "Sick Leave" });
+            if (annualAllocation > 0) balances.push({ empEmail: selectedEmpEmail, balance: annualAllocation, type: "Annual Leave" });
+            if (casualAllocation > 0) balances.push({ empEmail: selectedEmpEmail, balance: casualAllocation, type: "Casual Leave" });
+            if (otherAllocation > 0) balances.push({ empEmail: selectedEmpEmail, balance: otherAllocation, type: "Other Leave" });
+
+            await bulkAddLeaveBalances(balances as any);
+            toast.success("Balances Allocated", { description: `Successfully allocated total ${total} days for the employee.` });
+
             setShowForm(false);
             setSelectedEmpEmail("");
-            setLeaveDaysAllocation(0);
+            setSickAllocation(0);
+            setAnnualAllocation(0);
+            setCasualAllocation(0);
+            setOtherAllocation(0);
             return;
         }
 
@@ -215,16 +234,16 @@ export default function LeavesPage() {
                             <CardContent className="p-6">
                                 <form onSubmit={handleRequest} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {role === "employer" ? (
-                                        <>
-                                            <div className="space-y-1.5 md:col-span-2">
-                                                <Label className="text-sm font-semibold">Employee</Label>
+                                        <div className="lg:col-span-full space-y-6">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Target Employee</Label>
                                                 <select
-                                                    className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                                                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                                     value={selectedEmpEmail}
                                                     onChange={e => setSelectedEmpEmail(e.target.value)}
                                                     required
                                                 >
-                                                    <option value="">Select employee</option>
+                                                    <option value="">Select employee from directory...</option>
                                                     {employees.map(emp => (
                                                         <option key={emp.id} value={emp.email}>
                                                             {emp.name} ({emp.email})
@@ -232,32 +251,71 @@ export default function LeavesPage() {
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-sm font-semibold">Leave Type</Label>
-                                                <select
-                                                    className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                                                    value={leaveType}
-                                                    onChange={e => setLeaveType(e.target.value)}
-                                                >
-                                                    {leaveTypeOptions.filter(t => t !== "Half Day Leave").map(t => (
-                                                        <option key={t}>{t}</option>
-                                                    ))}
-                                                </select>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                <div className="space-y-1.5 p-4 rounded-2xl bg-rose-50/50 border border-rose-100">
+                                                    <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-rose-600 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Sick Leaves
+                                                    </Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        className="h-10 bg-white rounded-xl border-rose-100 focus:ring-rose-200"
+                                                        value={sickAllocation || ""}
+                                                        onChange={e => setSickAllocation(Number(e.target.value))}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5 p-4 rounded-2xl bg-blue-50/50 border border-blue-100">
+                                                    <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Annual Leaves
+                                                    </Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        className="h-10 bg-white rounded-xl border-blue-100 focus:ring-blue-200"
+                                                        value={annualAllocation || ""}
+                                                        onChange={e => setAnnualAllocation(Number(e.target.value))}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5 p-4 rounded-2xl bg-violet-50/50 border border-violet-100">
+                                                    <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-violet-600 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Casual Leaves
+                                                    </Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        className="h-10 bg-white rounded-xl border-violet-100 focus:ring-violet-200"
+                                                        value={casualAllocation || ""}
+                                                        onChange={e => setCasualAllocation(Number(e.target.value))}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5 p-4 rounded-2xl bg-slate-50/50 border border-slate-200">
+                                                    <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Other Leaves
+                                                    </Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        className="h-10 bg-white rounded-xl border-slate-200"
+                                                        value={otherAllocation || ""}
+                                                        onChange={e => setOtherAllocation(Number(e.target.value))}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-sm font-semibold">Total Days to Allocate</Label>
-                                                <Input
-                                                    required
-                                                    type="number"
-                                                    min="1"
-                                                    max="365"
-                                                    placeholder="e.g. 20"
-                                                    className="rounded-lg"
-                                                    value={leaveDaysAllocation || ""}
-                                                    onChange={e => setLeaveDaysAllocation(Number(e.target.value))}
-                                                />
+
+                                            <div className="mt-6 p-4 rounded-2xl bg-slate-900 text-white flex items-center justify-between border border-slate-800 shadow-lg">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                                                        <CalendarDays className="w-5 h-5 text-indigo-400" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Annual Allocation</p>
+                                                        <p className="text-xl font-black">{sickAllocation + annualAllocation + casualAllocation + otherAllocation} <span className="text-xs font-medium text-slate-400">Days per Year</span></p>
+                                                    </div>
+                                                </div>
+                                                <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-black text-[10px] uppercase">Calculated Block</Badge>
                                             </div>
-                                        </>
+                                        </div>
                                     ) : (
                                         <>
                                             {/* Half-day toggle */}

@@ -34,6 +34,10 @@ export type Employee = {
     aboutMe?: string;
     linkedin?: string;
     ctc?: string;
+    pf?: string;
+    tds?: string;
+    insuranceOpted?: boolean;
+    insuranceAmount?: string;
 };
 export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
@@ -70,6 +74,8 @@ export type ChatMessage = { id?: string; sender: string; receiver: string; text:
 export type Job = { id?: string; title: string; department: string; applicants: number; type: string; postedAt: string; status: "Active" | "Closed" };
 export type ProfileUpdateRequest = { id?: string; empId: string; empEmail: string; empName: string; fields: Partial<Employee>; status: "Pending" | "Approved" | "Rejected"; requestedAt: string; companyName?: string; };
 export type LeaveBalance = { id?: string; empEmail: string; type: string; balance: number; companyName?: string };
+export type PayslipRequest = { id?: string; empEmail: string; empName: string; month: string; status: "Pending" | "Fulfilled"; requestedAt: string; companyName?: string };
+export type Announcement = { id?: string; title: string; message: string; createdAt: string; authorName: string; companyName?: string; type: "News" | "Update" | "Event" | "Urgent"; startTime?: string; endTime?: string };
 
 interface AppContextType {
     employees: Employee[];
@@ -81,6 +87,11 @@ interface AppContextType {
     approveRegistration: (uid: string, empId: string) => Promise<void>;
     rejectRegistration: (uid: string) => Promise<void>;
     pendingRegistrations: { uid: string; email: string; companyName?: string }[];
+    payslipRequests: PayslipRequest[];
+    fulfillPayslipRequest: (id: string, email: string) => Promise<void>;
+    announcements: Announcement[];
+    addAnnouncement: (ann: Omit<Announcement, "id" | "createdAt" | "companyName">) => Promise<void>;
+    deleteAnnouncement: (id: string) => Promise<void>;
 
     profileUpdates: ProfileUpdateRequest[];
     requestProfileUpdate: (empId: string, empName: string, empEmail: string, fields: Partial<Employee>) => Promise<void>;
@@ -95,6 +106,7 @@ interface AppContextType {
 
     leaveBalances: LeaveBalance[];
     addLeaveBalance: (balance: Omit<LeaveBalance, "id" | "companyName">) => Promise<void>;
+    bulkAddLeaveBalances: (balances: Omit<LeaveBalance, "id" | "companyName">[]) => Promise<void>;
     updateLeaveBalance: (id: string, amount: number) => Promise<void>;
     deleteLeaveBalance: (id: string) => Promise<void>;
 
@@ -172,6 +184,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [payslipRequests, setPayslipRequests] = useState<PayslipRequest[]>([]);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [pendingRegistrations, setPendingRegistrations] = useState<{ uid: string; email: string; companyName?: string }[]>([]);
     const [chatReadTimestamps, setChatReadTimestamps] = useState<Record<string, number>>({});
@@ -307,9 +321,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 (error) => console.log("Firebase ChatReads Error:", error.message)
             );
 
-            const unsubProfileUpdates = onSnapshot(query(collection(db, "profile_updates"), where("companyName", "==", companyName), orderBy("requestedAt", "desc")), (snapshot) => {
+            const unsubscribeProfileUpdates = onSnapshot(query(collection(db, "profile_updates"), where("companyName", "==", companyName), orderBy("requestedAt", "desc")), (snapshot) => {
                 setProfileUpdates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfileUpdateRequest)));
             }, (error) => console.log("Firebase ProfileUpdates Setup Error:", error.message));
+
+            // Payslip Requests
+            const unsubscribePayslip = onSnapshot(query(collection(db, "payslip_requests"), where("companyName", "==", companyName)), (snapshot) => {
+                setPayslipRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as PayslipRequest));
+            }, (error) => console.log("Firebase Payslip Requests Error Setup:", error.message));
+
+            // Announcement subscription
+            const q = query(collection(db, "announcements"), where("companyName", "==", companyName));
+            const unsubscribeAnnouncements = onSnapshot(q, (snapshot) => {
+                console.log("Announcement snapshot received. Size:", snapshot.size, "Company:", companyName);
+                const sorted = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }) as Announcement)
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                setAnnouncements(sorted);
+            }, (error) => console.log("Firebase Announcements Error Setup:", error.message));
 
             return () => {
                 unsubEmployees();
@@ -325,8 +354,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 unsubDocTemplates();
                 unsubPending();
                 unsubChatReads();
-                unsubProfileUpdates();
+                unsubscribeProfileUpdates();
                 unsubLeaveBalances();
+                unsubscribePayslip();
+                unsubscribeAnnouncements();
             };
         } catch (e) {
             console.error("Firebase config missing or invalid.", e);
@@ -545,28 +576,53 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             const activeEmployees = employees.filter(e => e.status === "Active");
             const payrollPromises = activeEmployees.map(emp => {
+                // Calculate Net Salary: (CTC/12) - PF - TDS - Insurance
+                let amountStr = "";
+                if (emp.ctc) {
+                    const monthlyGross = Number(emp.ctc) / 12;
+                    const pf = Number(emp.pf || 0);
+                    const tds = Number(emp.tds || 0);
+                    const insurance = emp.insuranceOpted ? Number(emp.insuranceAmount || 0) : 0;
+                    const net = Math.max(0, monthlyGross - pf - tds - insurance);
+                    amountStr = `₹${Math.round(net).toLocaleString('en-IN')}`;
+                } else {
+                    // Fallback to old behavior for demo/existing data
+                    amountStr = `₹${Math.round(Math.random() * 40000 + 30000).toLocaleString('en-IN')}`;
+                }
+
                 return addDoc(collection(db, "payroll"), {
                     transactionId: `PR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`,
                     name: emp.name,
                     empEmail: emp.email,
                     department: emp.department,
-                    amount: `₹${(Math.random() * 40000 + 30000).toFixed(0)}`, // Base 30,000 to 70,000 INR
+                    amount: amountStr,
                     status: "Paid",
                     date: new Date().toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }),
                     companyName: companyName
                 });
             });
             await Promise.all(payrollPromises);
+            toast.success(`Payroll processed for ${activeEmployees.length} employees`);
         } catch (e) {
             console.error("Error processing payroll: ", e);
+            toast.error("Failed to process payroll");
         }
     };
 
     const requestPayslip = async (email: string) => {
         try {
+            const emp = employees.find(e => e.email === email);
+            await addDoc(collection(db, "payslip_requests"), {
+                empEmail: email,
+                empName: emp?.name || email,
+                month: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+                status: "Pending",
+                requestedAt: new Date().toISOString(),
+                companyName: companyName
+            });
             await addDoc(collection(db, "notifications"), {
                 title: "Payslip Requested",
-                message: `Employee ${email} has requested their recent payslip.`,
+                message: `Employee ${emp?.name || email} has requested their recent payslip.`,
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetRole: "employer",
@@ -574,6 +630,53 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
         } catch (e) {
             console.error("Error requesting payslip: ", e);
+        }
+    };
+
+    const fulfillPayslipRequest = async (id: string, email: string) => {
+        try {
+            await updateDoc(doc(db, "payslip_requests", id), { status: "Fulfilled" });
+            await addDoc(collection(db, "notifications"), {
+                title: "📄 Payslip Available",
+                message: `Your payroll for ${new Date().toLocaleDateString('en-IN', { month: 'long' })} has been processed and is now available.`,
+                timestamp: new Date().toISOString(),
+                isRead: false,
+                targetEmail: email,
+                targetRole: "employee",
+                companyName: companyName
+            });
+            toast.success("Payslip Request Fulfilled");
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const addAnnouncement = async (ann: Omit<Announcement, "id" | "createdAt" | "companyName">) => {
+        try {
+            console.log("Adding announcement:", ann);
+            const response = await fetch('/api/announcements/post', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ann),
+            });
+            const data = await response.json();
+            console.log("Add announcement response:", data);
+            if (!response.ok) throw new Error(data.error || "Failed to post");
+            toast.success("Announcement Posted Successfully!");
+        } catch (e: any) {
+            console.error("Add Announcement Error:", e);
+            toast.error(e.message || "Failed to post announcement");
+        }
+    };
+
+    const deleteAnnouncement = async (id: string) => {
+        try {
+            const response = await fetch(`/api/announcements/delete?id=${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error("Failed to delete");
+            toast.success("Announcement Removed");
+        } catch (e) {
+            console.error(e);
+            toast.error("Cleanup Failed");
         }
     };
 
@@ -867,6 +970,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const bulkAddLeaveBalances = async (balances: Omit<LeaveBalance, "id" | "companyName">[]) => {
+        try {
+            const batch = writeBatch(db);
+            balances.forEach(bal => {
+                const newDocRef = doc(collection(db, "leave_balances"));
+                batch.set(newDocRef, { ...bal, companyName });
+            });
+            await batch.commit();
+
+            // Send one notification for the total
+            const total = balances.reduce((acc, b) => acc + b.balance, 0);
+            await addDoc(collection(db, "notifications"), {
+                title: "📅 Leave Balances Allocated",
+                message: `Total ${total} days of annual leave have been allocated across ${balances.length} categories.`,
+                timestamp: new Date().toISOString(),
+                isRead: false,
+                targetEmail: balances[0].empEmail,
+                targetRole: "employee",
+                companyName
+            });
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to allocate leaves");
         }
     };
 
@@ -1176,8 +1305,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             approveRegistration, rejectRegistration, pendingRegistrations,
             profileUpdates, requestProfileUpdate, approveProfileUpdate, rejectProfileUpdate,
             leaves, requestLeave, updateLeaveStatus, approveLeaveRequest, rejectLeaveRequest,
-            leaveBalances, addLeaveBalance, updateLeaveBalance, deleteLeaveBalance,
-            payroll, processPayroll, requestPayslip,
+            leaveBalances, addLeaveBalance, bulkAddLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
+            payroll, processPayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
+            announcements, addAnnouncement, deleteAnnouncement,
             attendance, clockIn, clockOut, takeBreak, endBreak,
             tasks, addTask, updateTaskStatus, manageTaskTeam, deleteTask, updateTask, addTaskComment, addTaskAttachment,
             documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus,

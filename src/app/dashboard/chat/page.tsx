@@ -179,7 +179,7 @@ export default function ChatPage() {
                                         "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border",
                                         isSelected ? "bg-slate-900 text-white border-slate-900" : "bg-slate-50 text-slate-600 border-slate-200"
                                     )}>
-                                        {contact.name.charAt(0).toUpperCase()}
+                                        {(contact.name || "?").charAt(0).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0 pr-2">
                                         <div className="flex justify-between items-center mb-0.5">
@@ -224,7 +224,7 @@ export default function ChatPage() {
                                     <ArrowLeft className="w-5 h-5" />
                                 </button>
                                 <div className="w-10 h-10 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
-                                    {selectedContact.name.charAt(0).toUpperCase()}
+                                    {(selectedContact.name || "?").charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1">
                                     <h3 className="font-black text-lg text-slate-900 leading-tight">{selectedContact.name}</h3>
@@ -272,7 +272,7 @@ export default function ChatPage() {
                                             >
                                                 {!isMe && showAvatar && (
                                                     <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-600 shadow-sm shrink-0 mb-1">
-                                                        {selectedContact.name.charAt(0).toUpperCase()}
+                                                        {(selectedContact.name || "?").charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
                                                 {!isMe && !showAvatar && <div className="w-8 shrink-0" />}
