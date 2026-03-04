@@ -64,6 +64,12 @@ export default function PayrollPage() {
                 ctc, pf, tds, insuranceOpted, insuranceAmount
             });
 
+            // Automatically fulfill any pending payslip request for this employee
+            const pendingReq = payslipRequests.find(r => r.empEmail === selectedEmp.email && r.status === "Pending");
+            if (pendingReq && pendingReq.id) {
+                await fulfillPayslipRequest(pendingReq.id, selectedEmp.email);
+            }
+
             toast.success("Payslip generated and disbursed successfully.");
             setSelectedEmp(null);
         } catch (err) {
@@ -83,23 +89,32 @@ export default function PayrollPage() {
 
             {/* ── Employee Selection for Disbursement ── */}
             <div>
-                <h2 className="text-lg font-bold text-slate-800 mb-4">Employee Directory</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-slate-800">Employee Directory</h2>
+                    <Badge variant="outline" className="text-slate-500 bg-white">Select an employee to disburse</Badge>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {employees.filter(e => e.status === "Active" && payslipRequests.some(r => r.empEmail === e.email && r.status === "Pending")).map(emp => (
-                        <Card key={emp.id} className="cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => openDisburseModal(emp)}>
-                            <CardContent className="p-4 flex items-center gap-3 border-b-0">
-                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0">
-                                    {emp.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="overflow-hidden">
-                                    <p className="text-sm font-bold text-slate-900 truncate">{emp.name}</p>
-                                    <p className="text-xs text-slate-500 truncate">{emp.department}</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                    {employees.filter(e => e.status === "Active" && payslipRequests.some(r => r.empEmail === e.email && r.status === "Pending")).length === 0 && (
-                        <p className="text-sm text-slate-500 italic col-span-full">No active employees with pending payslip requests found.</p>
+                    {employees.filter(e => e.status === "Active").map(emp => {
+                        const hasPendingRequest = payslipRequests.some(r => r.empEmail === emp.email && r.status === "Pending");
+                        return (
+                            <Card key={emp.id} className={cn("cursor-pointer transition-all relative overflow-hidden", hasPendingRequest ? "border-indigo-300 shadow-md shadow-indigo-100" : "hover:border-slate-300")} onClick={() => openDisburseModal(emp)}>
+                                {hasPendingRequest && (
+                                    <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-rose-500 m-3 z-10 shadow-sm ring-2 ring-white animate-pulse" />
+                                )}
+                                <CardContent className="p-4 flex items-center gap-3 border-b-0 relative">
+                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0", hasPendingRequest ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-600")}>
+                                        {emp.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="overflow-hidden">
+                                        <p className="text-sm font-bold text-slate-900 truncate pr-4">{emp.name}</p>
+                                        <p className="text-xs text-slate-500 truncate">{emp.department}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                    {employees.filter(e => e.status === "Active").length === 0 && (
+                        <p className="text-sm text-slate-500 italic col-span-full bg-slate-50 p-6 rounded-lg text-center border border-dashed border-slate-200">No active employees found to disburse salary to.</p>
                     )}
                 </div>
             </div>

@@ -34,7 +34,7 @@ import { useState } from "react";
 export function Sidebar() {
     const pathname = usePathname();
     const { role, logout, user } = useAuth();
-    const { teams, chatMessages, chatReadTimestamps, profileUpdates, employees } = useApp();
+    const { teams, chatMessages, chatReadTimestamps, profileUpdates, employees, payslipRequests } = useApp();
     const [collapsed, setCollapsed] = useState(false);
 
     const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
@@ -50,6 +50,7 @@ export function Sidebar() {
         : 0;
 
     const pendingProfileUpdates = profileUpdates?.filter(r => r.status === "Pending").length || 0;
+    const pendingPayslipRequests = payslipRequests?.filter(r => r.status === "Pending").length || 0;
 
     const employerLinks = [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -62,7 +63,7 @@ export function Sidebar() {
         { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
         { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
         { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
-        { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard },
+        { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard, badge: pendingPayslipRequests },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
         { name: "Billing", href: "/dashboard/billing", icon: Wallet },
     ];
