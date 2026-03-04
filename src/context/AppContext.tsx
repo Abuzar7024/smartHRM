@@ -145,6 +145,8 @@ interface AppContextType {
     notifications: NotificationItem[];
     createNotification: (notif: Omit<NotificationItem, "id" | "timestamp" | "isRead">) => Promise<void>;
     markNotificationRead: (id: string) => Promise<void>;
+    clearNotification: (id: string) => Promise<void>;
+    clearAllNotifications: (notifications: NotificationItem[]) => Promise<void>;
 
     jobs: Job[];
     addJob: (job: Omit<Job, "id" | "postedAt" | "applicants">) => Promise<void>;
@@ -1196,6 +1198,29 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const clearNotification = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, "notifications", id));
+        } catch (e) {
+            console.error("Error clearing notification:", e);
+        }
+    };
+
+    const clearAllNotifications = async (notificationsToClear: NotificationItem[]) => {
+        try {
+            const batch = writeBatch(db);
+            notificationsToClear.forEach(n => {
+                if (n.id) {
+                    batch.delete(doc(db, "notifications", n.id));
+                }
+            });
+            await batch.commit();
+        } catch (e) {
+            console.error("Error clearing all notifications:", e);
+            throw e;
+        }
+    };
+
     const createTeam = async (team: Omit<Team, "id" | "createdAt">) => {
         try {
             await addDoc(collection(db, "teams"), {
@@ -1359,7 +1384,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             tasks, addTask, updateTaskStatus, manageTaskTeam, deleteTask, updateTask, addTaskComment, addTaskAttachment,
             documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus,
             docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
-            notifications, createNotification, markNotificationRead,
+            notifications, createNotification, markNotificationRead, clearNotification, clearAllNotifications,
             jobs, addJob, updateJobStatus,
             teams, createTeam, updateTeam, deleteTeam,
             chatMessages, sendMessage, deleteMessage, clearChat, reactToMessage, markChatRead, chatReadTimestamps,

@@ -21,7 +21,7 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const { user, loading: authLoading, role, status, companyName, logout } = useAuth();
-    const { leaves, notifications, markNotificationRead, employees } = useApp();
+    const { leaves, notifications, markNotificationRead, employees, clearNotification, clearAllNotifications } = useApp();
     const router = useRouter();
     const pathname = usePathname();
     const [isClient, setIsClient] = useState(false);
@@ -114,7 +114,8 @@ export default function DashboardLayout({
         if (t.includes("leave") || t.includes("time off")) return "/dashboard/leaves";
         if (t.includes("task") || t.includes("assigned")) return "/dashboard/tasks";
         if (t.includes("chat") || t.includes("message")) return "/dashboard/chat";
-        if (t.includes("payroll") || t.includes("payslip") || t.includes("salary")) return "/dashboard/payroll";
+        if (t.includes("payroll") || t.includes("payslip") || t.includes("salary")) return role === "employer" ? "/dashboard/payroll" : "/dashboard/payslips";
+        if (t.includes("clearance") || t.includes("permission") || t.includes("security")) return role === "employer" ? "/dashboard/employees" : "/dashboard/profile";
         if (t.includes("registration") || t.includes("approved") || t.includes("welcome")) return "/dashboard";
         if (t.includes("attendance") || t.includes("clock")) return "/dashboard";
         return "/dashboard";
@@ -370,7 +371,12 @@ export default function DashboardLayout({
                                     >
                                         <div className="w-80 bg-white rounded-lg shadow-2xl border border-slate-100 p-4 text-left max-h-[400px] overflow-y-auto">
                                             <div className="flex items-center justify-between mb-4 px-2">
-                                                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Recent Alerts</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Recent Alerts</h3>
+                                                    {myNotifications.length > 0 && (
+                                                        <button onClick={(e) => { e.stopPropagation(); clearAllNotifications(myNotifications); }} className="text-[9px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded hover:bg-rose-50 hover:text-rose-600 transition-colors">Clear All</button>
+                                                    )}
+                                                </div>
                                                 <button onClick={() => setIsNotifOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
                                             </div>
                                             <div className="space-y-3">
@@ -397,12 +403,22 @@ export default function DashboardLayout({
                                                             )}>
                                                                 <Info className="w-4 h-4" />
                                                             </div>
-                                                            <div className="text-left flex-1 min-w-0">
+                                                            <div className="text-left flex-1 min-w-0 pr-6 relative group">
                                                                 <p className={cn("text-xs font-bold truncate", notif.isRead ? "text-slate-600" : "text-slate-900")}>
                                                                     {notif.title}
                                                                 </p>
                                                                 <p className="text-[10px] text-slate-500 mt-0.5 whitespace-pre-wrap leading-tight">{notif.message}</p>
                                                                 <p className="text-[9px] text-slate-400 mt-1">{new Date(notif.timestamp).toLocaleString()}</p>
+
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (notif.id) clearNotification(notif.id);
+                                                                    }}
+                                                                    className="absolute top-0 right-0 p-1.5 rounded-full text-slate-300 opacity-0 group-hover:opacity-100 md:opacity-100 md:bg-transparent bg-slate-100 transition-opacity hover:bg-rose-100 hover:text-rose-600"
+                                                                >
+                                                                    <X className="w-3.5 h-3.5" />
+                                                                </button>
                                                             </div>
                                                             {!notif.isRead && (
                                                                 <div className="w-2 h-2 rounded-full bg-primary mt-1 flex-shrink-0" />
