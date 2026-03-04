@@ -163,10 +163,10 @@ export default function ChatPage() {
                                     key={contact.email}
                                     onClick={() => handleSelectContact(contact.email)}
                                     className={cn(
-                                        "w-full text-left p-3 rounded-2xl flex items-center gap-4 transition-all duration-300 relative group",
+                                        "w-full text-left p-3 rounded-xl flex items-center gap-4 transition-colors relative group",
                                         isSelected
-                                            ? "bg-gradient-to-r from-indigo-50 to-white shadow-sm border border-indigo-100"
-                                            : "hover:bg-slate-50 border border-transparent"
+                                            ? "bg-slate-100 font-medium"
+                                            : "hover:bg-slate-50"
                                     )}
                                 >
                                     {isSelected && (
@@ -188,7 +188,7 @@ export default function ChatPage() {
                                                 {hasUnread && (
                                                     <motion.span
                                                         initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-                                                        className="w-5 h-5 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-md shadow-pink-500/20 shrink-0"
+                                                        className="w-5 h-5 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0"
                                                     >
                                                         {contact.unread}
                                                     </motion.span>
@@ -196,8 +196,8 @@ export default function ChatPage() {
                                             </AnimatePresence>
                                         </div>
                                         <p className={cn(
-                                            "text-xs truncate font-medium",
-                                            hasUnread ? "text-indigo-600 font-bold" : "text-slate-400"
+                                            "text-xs truncate text-slate-500",
+                                            hasUnread && "font-bold text-slate-800"
                                         )}>
                                             {contact.lastMsg?.text || contact.role}
                                         </p>
@@ -264,10 +264,7 @@ export default function ChatPage() {
                                                 key={msg.id || idx}
                                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                exit={isClearing ? {
-                                                    opacity: 0, y: 100, rotate: Math.random() * 20 - 10, scale: 0.8,
-                                                    transition: { duration: 0.6, ease: "backIn", delay: idx * 0.02 }
-                                                } : { opacity: 0, scale: 0.8 }}
+                                                exit={{ opacity: 0 }}
                                                 className={cn("flex group items-end gap-3", isMe ? "justify-end" : "justify-start")}
                                             >
                                                 {!isMe && showAvatar && (
@@ -279,10 +276,10 @@ export default function ChatPage() {
 
                                                 <div className={cn("flex max-w-[75%] items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
                                                     <div className={cn(
-                                                        "px-4 py-3 shadow-sm relative transition-all duration-300",
+                                                        "px-4 py-3 relative",
                                                         isMe
-                                                            ? "bg-slate-900 text-white rounded-xl rounded-br-sm border border-slate-800"
-                                                            : "bg-slate-50 border border-slate-200 text-slate-800 rounded-xl rounded-bl-sm"
+                                                            ? "bg-slate-800 text-white rounded-xl rounded-tr-sm"
+                                                            : "bg-slate-100 text-slate-800 rounded-xl rounded-tl-sm"
                                                     )}>
                                                         {replyTo && (
                                                             <div className={cn(
@@ -317,18 +314,18 @@ export default function ChatPage() {
 
                                                     {/* Quick Actions (Hover) */}
                                                     {!isClearing && (
-                                                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2">
+                                                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             {!isMe && (
-                                                                <button onClick={() => reactToMessage(msg.id!, msg.reaction ? null : "👍")} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full shadow-sm text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all">
-                                                                    <SmilePlus className="w-4 h-4" />
+                                                                <button onClick={() => reactToMessage(msg.id!, msg.reaction ? null : "👍")} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                                                                    <SmilePlus className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
-                                                            <button onClick={() => setReplyingTo(msg)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full shadow-sm text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all">
-                                                                <Reply className="w-4 h-4" />
+                                                            <button onClick={() => setReplyingTo(msg)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                                                                <Reply className="w-3.5 h-3.5" />
                                                             </button>
                                                             {isMe && (
-                                                                <button onClick={() => deleteMessage(msg.id!)} className="w-8 h-8 flex items-center justify-center bg-white border border-rose-100 rounded-full shadow-sm text-rose-400 hover:text-rose-600 hover:scale-110 transition-all">
-                                                                    <Trash2 className="w-4 h-4" />
+                                                                <button onClick={() => deleteMessage(msg.id!)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-rose-600">
+                                                                    <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
                                                         </div>
@@ -404,17 +401,15 @@ export default function ChatPage() {
                             </div>
                         </>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center relative">
-                            {/* Decorative empty state */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-5">
-                                <MessageSquare className="w-[400px] h-[400px]" />
-                            </div>
-                            <div className="z-10 text-center">
-                                <div className="w-16 h-16 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                                    <MessageSquare className="w-8 h-8 text-slate-400" />
+                        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/50">
+                            <div className="text-center space-y-3">
+                                <div className="w-12 h-12 bg-white border border-slate-200 rounded-xl flex items-center justify-center mx-auto shadow-sm">
+                                    <MessageSquare className="w-5 h-5 text-slate-400" />
                                 </div>
-                                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Select a conversation</h2>
-                                <p className="text-slate-500 font-medium mt-2 max-w-xs mx-auto text-sm">Choose a teammate from the directory to start collaborating.</p>
+                                <div>
+                                    <h2 className="text-sm font-bold text-slate-900">No conversation selected</h2>
+                                    <p className="text-xs text-slate-500 mt-1">Select a teammate from the directory to message</p>
+                                </div>
                             </div>
                         </div>
                     )}

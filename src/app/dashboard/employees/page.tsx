@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp, Employee } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -15,9 +15,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function EmployeesPage() {
-    const { role } = useAuth();
+    const { role, companyName } = useAuth();
     const router = useRouter();
     const { employees, documents, docTemplates, requestMultipleDocuments, addDocTemplate, deleteDocTemplate, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +33,37 @@ export default function EmployeesPage() {
     const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
     const [docTitle, setDocTitle] = useState("");
     const [docRequired, setDocRequired] = useState(false);
+
+    // Dynamic Departments & Roles (SaaS requirement)
+    const [companyConfig, setCompanyConfig] = useState<{ departments: { name: string; roles: string[] }[] }>({
+        departments: [
+            { name: "Engineering", roles: ["Software Engineer", "Frontend Developer", "Backend Developer"] },
+            { name: "Human Resources", roles: ["HR Manager", "HR Executive"] },
+            { name: "Finance", roles: ["Accountant"] },
+            { name: "Sales", roles: ["Sales Executive"] },
+            { name: "Marketing", roles: ["Marketing Manager"] },
+            { name: "Operations", roles: [] },
+            { name: "Customer Support", roles: [] },
+            { name: "Product", roles: ["Product Manager", "UI/UX Designer"] },
+            { name: "Administration", roles: [] }
+        ]
+    });
+
+    useEffect(() => {
+        if (!companyName) return;
+        getDoc(doc(db, "companySettings", companyName)).then(snap => {
+            if (snap.exists() && snap.data().departments) {
+                setCompanyConfig(snap.data() as any);
+            }
+        });
+    }, [companyName]);
+
+    const saveCompanyConfig = async (newConfig: any) => {
+        setCompanyConfig(newConfig);
+        if (companyName) {
+            await setDoc(doc(db, "companySettings", companyName), newConfig, { merge: true });
+        }
+    };
 
     // Form State
     const [empName, setEmpName] = useState("");
@@ -128,7 +162,29 @@ export default function EmployeesPage() {
         (emp.email?.toLowerCase() || "").includes((searchTerm || "").toLowerCase())
     );
 
+    const availableDepartments = useMemo(() => companyConfig.departments.map(d => d.name), [companyConfig]);
+    const availableRoles = useMemo(() => {
+        const deptObj = companyConfig.departments.find(d => d.name === empDept);
+        return deptObj ? deptObj.roles : [];
+    }, [empDept, companyConfig]);
 
+    const handleAddDepartment = (newDept: string) => {
+        if (companyConfig.departments.some(d => d.name.toLowerCase() === newDept.toLowerCase())) return;
+        saveCompanyConfig({ departments: [...companyConfig.departments, { name: newDept, roles: [] }] });
+        toast.success(`Department "${newDept}" added!`);
+    };
+
+    const handleAddRole = (newRole: string) => {
+        if (!empDept) return;
+        const mappedConfig = companyConfig.departments.map(d => {
+            if (d.name === empDept) {
+                if (!d.roles.includes(newRole)) return { ...d, roles: [...d.roles, newRole] };
+            }
+            return d;
+        });
+        saveCompanyConfig({ departments: mappedConfig });
+        toast.success(`Role "${newRole}" added to ${empDept}!`);
+    };
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!empName || !empEmail || !empPassword) return;
@@ -260,46 +316,34 @@ export default function EmployeesPage() {
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Initial Password</Label>
                                         <Input required type="password" value={empPassword} onChange={e => setEmpPassword(e.target.value)} placeholder="••••••••" className="rounded-lg" />
                                     </div>
+                                    <div className="space-y-1.5 lg:col-span-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
+                                        <SearchableDropdown
+                                            value={empDept}
+                                            onChange={(val) => { setEmpDept(val); setEmpRole(""); }}
+                                            options={availableDepartments}
+                                            placeholder="Select department..."
+                                            onAddTarget={handleAddDepartment}
+                                            onAddActionLabel="+ Create Department"
+                                        />
+                                    </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Job Role</Label>
-                                        <select
-                                            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                                        <SearchableDropdown
                                             value={empRole}
-                                            onChange={e => setEmpRole(e.target.value)}
-                                            required
-                                        >
-                                            <option value="">Select Role</option>
-                                            <option value="Manager">Manager</option>
-                                            <option value="Software Engineer">Software Engineer</option>
-                                            <option value="HR Specialist">HR Specialist</option>
-                                            <option value="Designer">Designer</option>
-                                            <option value="Staff">Staff</option>
-                                            <option value="Intern">Intern</option>
-                                        </select>
+                                            onChange={setEmpRole}
+                                            options={availableRoles}
+                                            placeholder={empDept ? "Select a role..." : "Please choose department first"}
+                                            disabled={!empDept}
+                                            onAddTarget={handleAddRole}
+                                            onAddActionLabel="+ Add Role to Department"
+                                        />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-bold text-slate-500 uppercase">Position</Label>
                                         <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Senior Frontend Engineer" className="rounded-lg" />
                                     </div>
-                                    <div className="space-y-1.5 lg:col-span-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
-                                        <select
-                                            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                                            value={empDept}
-                                            onChange={e => setEmpDept(e.target.value)}
-                                            required
-                                        >
-                                            <option value="">Select Department</option>
-                                            <option value="Engineering">Engineering</option>
-                                            <option value="Human Resources">Human Resources</option>
-                                            <option value="Design">Design</option>
-                                            <option value="Marketing">Marketing</option>
-                                            <option value="Sales">Sales</option>
-                                            <option value="General">General</option>
-                                        </select>
-                                    </div>
 
-                                    {/* Onboarding Documents Field */}
                                     <div className="md:col-span-2 lg:col-span-3 space-y-4 pt-6 border-t mt-6">
                                         <div className="flex items-center justify-between mb-4">
                                             <Label className="text-sm font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-2">
@@ -593,7 +637,10 @@ export default function EmployeesPage() {
                             {[
                                 { id: "assign_tasks", label: "Assign Tasks", desc: "Can create and assign tasks to other employees." },
                                 { id: "manage_leaves", label: "Manage Leaves", desc: "Can approve/reject leaves and assign leave balances." },
-                                { id: "view_payroll", label: "View Payroll", desc: "Can view payroll information for employees." }
+                                { id: "view_payroll", label: "View Payroll", desc: "Can view payroll information for employees." },
+                                { id: "manage_employees", label: "Manage Employees", desc: "Can onboard new employees and edit roles." },
+                                { id: "manage_documents", label: "Manage Documents", desc: "Can review and approve employee documents." },
+                                { id: "view_analytics", label: "View Analytics", desc: "Can view company-wide performance metrics." }
                             ].map(perm => (
                                 <div key={perm.id} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => togglePermission(perm.id)}>
                                     <div className="pt-0.5">

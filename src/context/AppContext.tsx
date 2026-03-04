@@ -112,6 +112,7 @@ interface AppContextType {
 
     payroll: Payroll[];
     processPayroll: () => Promise<void>;
+    processSinglePayroll: (emp: Employee, overrideAmount?: string) => Promise<void>;
     requestPayslip: (email: string) => Promise<void>;
 
     attendance: Attendance[];
@@ -614,6 +615,38 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (e) {
             console.error("Error processing payroll: ", e);
             toast.error("Failed to process payroll");
+        }
+    };
+
+    const processSinglePayroll = async (emp: Employee, overrideAmount?: string) => {
+        try {
+            let amountStr = overrideAmount || "";
+            if (!amountStr) {
+                if (emp.ctc) {
+                    const monthlyGross = Number(emp.ctc) / 12;
+                    const pf = Number(emp.pf || 0);
+                    const tds = Number(emp.tds || 0);
+                    const insurance = emp.insuranceOpted ? Number(emp.insuranceAmount || 0) : 0;
+                    const net = Math.max(0, monthlyGross - pf - tds - insurance);
+                    amountStr = `₹${Math.round(net).toLocaleString('en-IN')}`;
+                } else {
+                    amountStr = `₹0`;
+                }
+            }
+
+            await addDoc(collection(db, "payroll"), {
+                transactionId: `PR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 100)}`,
+                name: emp.name,
+                empEmail: emp.email,
+                department: emp.department,
+                amount: amountStr,
+                status: "Paid",
+                date: new Date().toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }),
+                companyName: companyName
+            });
+        } catch (e) {
+            console.error("Error processing single payroll: ", e);
+            throw e;
         }
     };
 
@@ -1315,7 +1348,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             profileUpdates, requestProfileUpdate, approveProfileUpdate, rejectProfileUpdate,
             leaves, requestLeave, updateLeaveStatus, approveLeaveRequest, rejectLeaveRequest,
             leaveBalances, addLeaveBalance, bulkAddLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
-            payroll, processPayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
+            payroll, processPayroll, processSinglePayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
             announcements, addAnnouncement, deleteAnnouncement,
             attendance, clockIn, clockOut, takeBreak, endBreak,
             tasks, addTask, updateTaskStatus, manageTaskTeam, deleteTask, updateTask, addTaskComment, addTaskAttachment,

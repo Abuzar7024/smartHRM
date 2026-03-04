@@ -1,18 +1,30 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useApp } from "@/context/AppContext";
+import { useApp, Employee } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { motion } from "framer-motion";
-import { Download, CheckCircle2, IndianRupee, CreditCard, ShieldCheck, Wallet } from "lucide-react";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { ShieldCheck, IndianRupee, CreditCard, Download, User, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function PayrollPage() {
     const { role } = useAuth();
-    const { payroll, processPayroll, payslipRequests, fulfillPayslipRequest } = useApp();
+    const { employees, updateEmployee, processSinglePayroll, payroll, payslipRequests, fulfillPayslipRequest } = useApp();
+
+    const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+    const [ctc, setCtc] = useState("");
+    const [pf, setPf] = useState("");
+    const [tds, setTds] = useState("");
+    const [insuranceOpted, setInsuranceOpted] = useState(false);
+    const [insuranceAmount, setInsuranceAmount] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (role !== "employer") {
         return (
@@ -24,67 +36,89 @@ export default function PayrollPage() {
         );
     }
 
-    const totalPayroll = payroll.reduce((acc, pr) => {
-        return acc + parseFloat(pr.amount.replace(/[^0-9.-]+/g, ""));
-    }, 0);
+    const openDisburseModal = (emp: Employee) => {
+        setSelectedEmp(emp);
+        setCtc(emp.ctc || "");
+        setPf(emp.pf || "");
+        setTds(emp.tds || "");
+        setInsuranceOpted(emp.insuranceOpted || false);
+        setInsuranceAmount(emp.insuranceAmount || "");
+    };
+
+    const handleDisburse = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedEmp?.id) return;
+
+        setIsSubmitting(true);
+        try {
+            await updateEmployee(selectedEmp.id, {
+                ctc,
+                pf,
+                tds,
+                insuranceOpted,
+                insuranceAmount
+            });
+
+            await processSinglePayroll({
+                ...selectedEmp,
+                ctc, pf, tds, insuranceOpted, insuranceAmount
+            });
+
+            toast.success("Payslip generated and disbursed successfully.");
+            setSelectedEmp(null);
+        } catch (err) {
+            toast.error("Failed to disburse salary.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
             {/* ── Header ── */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Payroll Processing</h1>
-                    <p className="text-sm text-slate-500">Manage salary disbursement and departmental budgets.</p>
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Payroll Processing</h1>
+                <p className="text-sm text-slate-500">Manage salary disbursement and departmental budgets.</p>
+            </div>
+
+            {/* ── Employee Selection for Disbursement ── */}
+            <div>
+                <h2 className="text-lg font-bold text-slate-800 mb-4">Employee Directory</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {employees.filter(e => e.status === "Active" && payslipRequests.some(r => r.empEmail === e.email && r.status === "Pending")).map(emp => (
+                        <Card key={emp.id} className="cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => openDisburseModal(emp)}>
+                            <CardContent className="p-4 flex items-center gap-3 border-b-0">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0">
+                                    {emp.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="text-sm font-bold text-slate-900 truncate">{emp.name}</p>
+                                    <p className="text-xs text-slate-500 truncate">{emp.department}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                    {employees.filter(e => e.status === "Active" && payslipRequests.some(r => r.empEmail === e.email && r.status === "Pending")).length === 0 && (
+                        <p className="text-sm text-slate-500 italic col-span-full">No active employees with pending payslip requests found.</p>
+                    )}
                 </div>
-                <Button
-                    className="rounded-lg shadow-sm"
-                    variant="corporate"
-                    onClick={processPayroll}
-                >
-                    <CheckCircle2 className="w-4 h-4 mr-2" /> Execute Salary Run
-                </Button>
             </div>
 
-            {/* ── Financial Indicators ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                    { title: "Total Multi-Period Expense", value: `₹${totalPayroll.toLocaleString('en-IN')}`, icon: Wallet, desc: "Cumulative payroll expenditure", color: "text-blue-600", bg: "bg-blue-50" },
-                    { title: "Departmental Allocation", value: "₹0.00", icon: CreditCard, desc: "Awaiting next cycle review", color: "text-amber-600", bg: "bg-amber-50" },
-                    { title: "Withholding (Est.)", value: `₹${(totalPayroll * 0.1).toLocaleString('en-IN')}`, icon: IndianRupee, desc: "Projected tax and statutory deductions", color: "text-emerald-600", bg: "bg-emerald-50" },
-                ].map((stat, i) => (
-                    <Card key={i} className="border-slate-200 shadow-sm rounded-xl">
-                        <CardContent className="p-5 flex items-center gap-4">
-                            <div className={cn("p-2.5 rounded-lg", stat.bg)}>
-                                <stat.icon className={cn("w-5 h-5", stat.color)} />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{stat.title}</p>
-                                <p className="text-xl font-bold text-slate-900">{stat.value}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* ── Transaction History & Requests ── */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <Card className="xl:col-span-2 border-slate-200 shadow-sm rounded-xl overflow-hidden h-fit">
                     <CardHeader className="bg-slate-50/50 border-b p-5">
-                        <div>
-                            <CardTitle className="text-base font-bold">Transaction Registry</CardTitle>
-                            <CardDescription className="text-xs">Verification logs for all processed salary events.</CardDescription>
-                        </div>
+                        <CardTitle className="text-base font-bold">Transaction Registry</CardTitle>
+                        <CardDescription className="text-xs">Verification logs for all processed salary events.</CardDescription>
                     </CardHeader>
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
-                                    <TableHead className="h-10">TID / ID</TableHead>
+                                    <TableHead className="h-10">TID</TableHead>
                                     <TableHead className="h-10">Beneficiary</TableHead>
                                     <TableHead className="h-10">Net Amount</TableHead>
-                                    <TableHead className="h-10">Process Date</TableHead>
+                                    <TableHead className="h-10">Date</TableHead>
                                     <TableHead className="h-10">Status</TableHead>
-                                    <TableHead className="h-10 text-right">Records</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -95,23 +129,14 @@ export default function PayrollPage() {
                                         </TableCell>
                                         <TableCell className="py-4">
                                             <div className="font-semibold text-slate-900">{pr.name}</div>
-                                            <div className="text-[11px] text-slate-500">{pr.department}</div>
+                                            <div className="text-[11px] text-slate-500">{pr.empEmail}</div>
                                         </TableCell>
-                                        <TableCell className="py-4 font-bold text-slate-900">
-                                            {pr.amount}
-                                        </TableCell>
-                                        <TableCell className="py-4 text-xs font-medium text-slate-500">
-                                            {pr.date}
-                                        </TableCell>
+                                        <TableCell className="py-4 font-bold text-slate-900">{pr.amount}</TableCell>
+                                        <TableCell className="py-4 text-xs font-medium text-slate-500">{pr.date}</TableCell>
                                         <TableCell className="py-4">
                                             <Badge variant={pr.status === "Paid" ? "success" : "warning"} className="rounded-md font-bold text-[10px] h-5 px-2">
                                                 {pr.status}
                                             </Badge>
-                                        </TableCell>
-                                        <TableCell className="py-4 text-right">
-                                            <Button variant="ghost" size="icon-sm" className="text-slate-400 hover:text-primary rounded-lg">
-                                                <Download className="w-4 h-4" />
-                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -120,7 +145,7 @@ export default function PayrollPage() {
                                         <TableCell colSpan={6} className="text-center py-20 text-slate-400">
                                             <div className="flex flex-col items-center gap-2 opacity-30">
                                                 <CreditCard className="w-8 h-8" />
-                                                <p className="text-sm font-medium">No payroll history found. Execute a Salary Run to begin.</p>
+                                                <p className="text-sm font-medium">No payroll history found.</p>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -130,13 +155,13 @@ export default function PayrollPage() {
                     </div>
                 </Card>
 
-                {/* ── Payslip Requests Section ── */}
+                {/* Payslip Requests */}
                 <Card className="xl:col-span-1 border-slate-200 shadow-sm rounded-xl bg-white h-fit">
                     <CardHeader className="bg-slate-50/50 border-b p-5">
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-base font-bold">Service Requests</CardTitle>
-                                <CardDescription className="text-xs">Employee requests for payslips/documents.</CardDescription>
+                                <CardDescription className="text-xs">Employee payslip requests.</CardDescription>
                             </div>
                             <Badge className="bg-rose-50 text-rose-600 border-rose-100 font-bold">
                                 {payslipRequests.filter(r => r.status === "Pending").length} NEW
@@ -149,7 +174,6 @@ export default function PayrollPage() {
                                 <div className="p-12 text-center text-slate-400">
                                     <IndianRupee className="w-8 h-8 mx-auto opacity-20 mb-3" />
                                     <p className="text-sm font-semibold">No pending requests</p>
-                                    <p className="text-[10px] uppercase">All employee inquiries resolved.</p>
                                 </div>
                             ) : (
                                 payslipRequests.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()).map((req) => (
@@ -162,27 +186,17 @@ export default function PayrollPage() {
                                                 <div>
                                                     <p className="text-sm font-bold text-slate-900">{req.empName}</p>
                                                     <p className="text-[10px] text-slate-500 font-medium">{req.empEmail}</p>
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 bg-indigo-50 border-indigo-100 text-indigo-700">
-                                                            {req.month}
-                                                        </Badge>
-                                                        <span className="text-[9px] text-slate-400 font-medium">
-                                                            {new Date(req.requestedAt).toLocaleDateString()}
-                                                        </span>
-                                                    </div>
+                                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 mt-1 bg-indigo-50 text-indigo-700">
+                                                        {req.month}
+                                                    </Badge>
                                                 </div>
                                             </div>
                                             {req.status === "Pending" ? (
-                                                <Button
-                                                    size="sm"
-                                                    variant="corporate"
-                                                    className="h-8 text-[10px] px-3 font-bold"
-                                                    onClick={() => fulfillPayslipRequest(req.id!, req.empEmail)}
-                                                >
-                                                    Send Payslip
+                                                <Button size="sm" variant="corporate" className="h-8 text-[10px] px-3 font-bold" onClick={() => fulfillPayslipRequest(req.id!, req.empEmail)}>
+                                                    Send
                                                 </Button>
                                             ) : (
-                                                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold text-[9px]">
+                                                <Badge className="bg-emerald-50 text-emerald-600 font-bold text-[9px]">
                                                     FULFILLED
                                                 </Badge>
                                             )}
@@ -194,6 +208,111 @@ export default function PayrollPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Disburse Modal */}
+            <AnimatePresence>
+                {selectedEmp && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-900">Disburse Salary</h3>
+                                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                                        <User className="w-3 h-3" /> {selectedEmp.name}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedEmp(null)}
+                                    className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto">
+                                <form id="disburseForm" onSubmit={handleDisburse} className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-semibold">Annual CTC (₹)</Label>
+                                        <Input
+                                            type="number"
+                                            required
+                                            value={ctc}
+                                            onChange={e => setCtc(e.target.value)}
+                                            placeholder="e.g. 1200000"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm font-semibold">PF Deduction (₹)</Label>
+                                            <Input
+                                                type="number"
+                                                value={pf}
+                                                onChange={e => setPf(e.target.value)}
+                                                placeholder="e.g. 1800"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm font-semibold">TDS Deduction (₹)</Label>
+                                            <Input
+                                                type="number"
+                                                value={tds}
+                                                onChange={e => setTds(e.target.value)}
+                                                placeholder="e.g. 5000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mt-2 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                id="optInsurance"
+                                                checked={insuranceOpted}
+                                                onChange={e => setInsuranceOpted(e.target.checked)}
+                                                className="rounded border-slate-300 w-4 h-4 text-primary"
+                                            />
+                                            <Label htmlFor="optInsurance" className="cursor-pointer text-sm font-semibold text-slate-700">Health Insurance Opt-In</Label>
+                                        </div>
+                                        {insuranceOpted && (
+                                            <div className="pl-7 space-y-1.5">
+                                                <Label className="text-xs font-semibold text-slate-500">Monthly Deduction (₹)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={insuranceAmount}
+                                                    onChange={e => setInsuranceAmount(e.target.value)}
+                                                    placeholder="e.g. 1200"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div className="p-5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                <span className={cn("text-xs font-semibold", ctc ? "text-slate-600" : "text-slate-400")}>
+                                    Net Salary: {ctc ? "₹" + Math.round(Math.max(0, (Number(ctc) / 12) - Number(pf || 0) - Number(tds || 0) - (insuranceOpted ? Number(insuranceAmount || 0) : 0))).toLocaleString('en-IN') : "-"}
+                                </span>
+                                <div className="flex gap-2">
+                                    <Button type="button" variant="ghost" onClick={() => setSelectedEmp(null)}>Cancel</Button>
+                                    <Button type="submit" form="disburseForm" variant="corporate" disabled={isSubmitting}>
+                                        {isSubmitting ? "Processing..." : "Generate Payslip"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

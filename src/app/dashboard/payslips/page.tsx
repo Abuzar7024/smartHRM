@@ -5,22 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { motion } from "framer-motion";
 import { Download, CreditCard, ShieldCheck, Wallet, Send } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { useState } from "react";
 
-const mockPayslips = [
-    { id: "PS-042024", period: "April 2024", date: "April 28, 2024", netPay: "₹142,000.00", status: "Processed" },
-    { id: "PS-032024", period: "March 2024", date: "March 28, 2024", netPay: "₹140,500.00", status: "Processed" },
-    { id: "PS-022024", period: "February 2024", date: "February 28, 2024", netPay: "₹142,000.00", status: "Processed" },
-];
-
 export default function PayslipsPage() {
     const { role, user } = useAuth();
-    const { requestPayslip } = useApp();
+    const { requestPayslip, payroll } = useApp();
     const [requesting, setRequesting] = useState(false);
 
     if (role !== "employee") {
@@ -32,6 +24,9 @@ export default function PayslipsPage() {
             </div>
         );
     }
+
+    const myPayslips = payroll.filter(p => p.empEmail === user?.email).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestPayslip = myPayslips.length > 0 ? myPayslips[0] : null;
 
     return (
         <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
@@ -67,7 +62,7 @@ export default function PayslipsPage() {
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Latest Net Earnings</p>
-                            <p className="text-xl font-bold">{mockPayslips[0].netPay}</p>
+                            <p className="text-xl font-bold">{latestPayslip ? latestPayslip.amount : "₹0"}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -78,7 +73,7 @@ export default function PayslipsPage() {
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Last Disbursement</p>
-                            <p className="text-xl font-bold text-slate-900">{mockPayslips[0].date}</p>
+                            <p className="text-xl font-bold text-slate-900">{latestPayslip ? latestPayslip.date : "N/A"}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -97,27 +92,23 @@ export default function PayslipsPage() {
                         <TableHeader>
                             <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
                                 <TableHead className="h-10">Statement ID</TableHead>
-                                <TableHead className="h-10">Pay Period</TableHead>
                                 <TableHead className="h-10">Disbursement Date</TableHead>
-                                <TableHead className="h-10">Net Amount</TableHead>
+                                <TableHead className="h-10">Total Paid</TableHead>
                                 <TableHead className="h-10">Status</TableHead>
                                 <TableHead className="h-10 text-right">View/Download</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockPayslips.map((ps) => (
+                            {myPayslips.map((ps) => (
                                 <TableRow key={ps.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
                                     <TableCell className="py-4 text-[10px] font-bold text-slate-400 font-mono">
-                                        {ps.id}
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                        <div className="font-semibold text-slate-900">{ps.period}</div>
+                                        {ps.transactionId || ps.id?.slice(-8).toUpperCase()}
                                     </TableCell>
                                     <TableCell className="py-4 text-xs font-medium text-slate-500">
                                         {ps.date}
                                     </TableCell>
                                     <TableCell className="py-4 font-bold text-slate-900">
-                                        {ps.netPay}
+                                        {ps.amount}
                                     </TableCell>
                                     <TableCell className="py-4">
                                         <Badge variant="success" className="rounded-md font-bold text-[10px] h-5 px-2 uppercase shadow-none ring-0">
@@ -131,6 +122,16 @@ export default function PayslipsPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
+                            {myPayslips.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-20 text-slate-400">
+                                        <div className="flex flex-col items-center gap-2 opacity-30">
+                                            <CreditCard className="w-8 h-8" />
+                                            <p className="text-sm font-medium">No payroll history found.</p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </div>
