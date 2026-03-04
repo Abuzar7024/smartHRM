@@ -5,13 +5,14 @@ import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
     PieChart, Pie, Cell, BarChart, Bar, Legend
 } from 'recharts';
 import {
     Brain, TrendingUp, Users, Trophy, Zap, ShieldCheck,
-    Target, Activity, Layers, Briefcase,
+    Target, Activity, Layers, Briefcase, UsersRound,
     Calendar, AlertCircle, ChevronRight, ArrowUpRight,
     PieChart as PieIcon, BarChart3, LineChart
 } from "lucide-react";
@@ -154,26 +155,42 @@ export default function AIInsightsPage() {
                         </select>
                     </CardHeader>
                     <CardContent className="p-6">
-                        <div className="h-[350px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={teamStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                                        dy={10}
-                                    />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                                    <Tooltip
-                                        cursor={{ fill: '#f8fafc' }}
-                                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
-                                    />
-                                    <Bar dataKey="efficiency" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={40} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                        {teamStats.length > 0 ? (
+                            <div className="h-[350px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={teamStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                                            dy={10}
+                                        />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                                        <Tooltip
+                                            cursor={{ fill: '#f8fafc' }}
+                                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
+                                        />
+                                        <Bar dataKey="efficiency" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={40} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-[350px] flex flex-col items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                                    <UsersRound className="w-8 h-8 text-slate-300" />
+                                </div>
+                                <h3 className="font-bold text-slate-900">No Teams Detected</h3>
+                                <p className="text-xs text-slate-500 mt-1 mb-6">Create a team first to analyze performance benchmarks.</p>
+                                <Button
+                                    onClick={() => window.location.href = '/dashboard/teams'}
+                                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-9 px-6 rounded-lg font-bold"
+                                >
+                                    Initialize First Team
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -300,7 +317,7 @@ export default function AIInsightsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {teamStats.map((team, idx) => (
+                            {teamStats.length > 0 ? teamStats.map((team, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <p className="text-sm font-bold text-slate-900">{team.name}</p>
@@ -323,7 +340,13 @@ export default function AIInsightsPage() {
                                         <span className="text-sm font-bold text-slate-900">{team.operations} <span className="text-[10px] text-slate-400 font-medium">Ops</span></span>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic text-xs">
+                                        Primary data initialization required.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

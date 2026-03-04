@@ -40,7 +40,7 @@ export type Employee = {
     insuranceOpted?: boolean;
     insuranceAmount?: string;
 };
-export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; halfDayPeriod?: "First Half" | "Second Half"; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
+export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; halfDayPeriod?: "First Half" | "Second Half"; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string; appliedAt?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
 export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out" | "Break Start" | "Break End"; timestamp: string };
 export type TaskActivity = { type: string; user: string; timestamp: string; detail?: string };
@@ -580,7 +580,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             throw err;
         }
         try {
-            await addDoc(collection(db, "leaves"), { ...leave, companyName });
+            await addDoc(collection(db, "leaves"), { ...leave, appliedAt: new Date().toISOString(), companyName });
             // Create notification for Medical leaves mostly, or all leaves for employers
             await addDoc(collection(db, "notifications"), {
                 title: `${leave.type} Request`,

@@ -52,6 +52,7 @@ export function Sidebar() {
 
     const pendingProfileUpdates = profileUpdates?.filter(r => r.status === "Pending").length || 0;
     const pendingPayslipRequests = payslipRequests?.filter(r => r.status === "Pending").length || 0;
+    const pendingLeaves = useApp().leaves.filter(l => l.status === "Pending").length;
 
     const employerLinks = [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -65,7 +66,7 @@ export function Sidebar() {
         { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
         { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard, badge: pendingPayslipRequests },
-        { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
+        { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays, badge: pendingLeaves },
         { name: "Billing", href: "/dashboard/billing", icon: Wallet },
     ];
 
