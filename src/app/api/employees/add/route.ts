@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
     try {
-        const { name, email, password, role, department, position } = await request.json();
+        const { name, email, password, role, department, position, ctc, pf, tds, insuranceOpted, insuranceAmount } = await request.json();
 
         // 1. Verify that the current user is an Employer
         const cookieStore = await cookies();
@@ -77,7 +77,12 @@ export async function POST(request: Request) {
             status: 'Invited', // Display status
             joinedAt: new Date(),
             leaveBalance: 12,
-            permissions: []
+            permissions: [],
+            ctc: ctc || "",
+            pf: pf || "",
+            tds: tds || "",
+            insuranceOpted: insuranceOpted || false,
+            insuranceAmount: insuranceAmount || ""
         });
 
         return NextResponse.json({ success: true, uid: userCredential.uid }, { status: 200 });
