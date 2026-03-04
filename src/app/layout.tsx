@@ -42,7 +42,7 @@ export default function RootLayout({
         <AuthProvider>
           <AppProvider>
             {children}
-            <Toaster position="top-right" richColors />
+            <Toaster position="top-right" richColors closeButton />
           </AppProvider>
         </AuthProvider>
         <SpeedInsights />
