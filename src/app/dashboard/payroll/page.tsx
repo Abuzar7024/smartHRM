@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { ShieldCheck, IndianRupee, CreditCard, Download, User, X } from "lucide-react";
+import { ShieldCheck, IndianRupee, CreditCard, Download, User, X, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -99,7 +99,10 @@ export default function PayrollPage() {
                         return (
                             <Card key={emp.id} className={cn("cursor-pointer transition-all relative overflow-hidden", hasPendingRequest ? "border-indigo-300 shadow-md shadow-indigo-100" : "hover:border-slate-300")} onClick={() => openDisburseModal(emp)}>
                                 {hasPendingRequest && (
-                                    <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-rose-500 m-3 z-10 shadow-sm ring-2 ring-white animate-pulse" />
+                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10 bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-md shadow-sm animate-pulse">
+                                        <MessageSquare className="w-2.5 h-2.5" />
+                                        PENDING
+                                    </div>
                                 )}
                                 <CardContent className="p-4 flex items-center gap-3 border-b-0 relative">
                                     <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0", hasPendingRequest ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-600")}>
