@@ -635,12 +635,12 @@ export default function EmployeesPage() {
                     {selectedEmp && (
                         <div className="py-4 space-y-4">
                             {[
-                                { id: "assign_tasks", label: "Assign Tasks", desc: "Can create and assign tasks to other employees." },
-                                { id: "manage_leaves", label: "Manage Leaves", desc: "Can approve/reject leaves and assign leave balances." },
-                                { id: "view_payroll", label: "View Payroll", desc: "Can view payroll information for employees." },
-                                { id: "manage_employees", label: "Manage Employees", desc: "Can onboard new employees and edit roles." },
-                                { id: "manage_documents", label: "Manage Documents", desc: "Can review and approve employee documents." },
-                                { id: "view_analytics", label: "View Analytics", desc: "Can view company-wide performance metrics." }
+                                { id: "request_leave", label: "Request Own Leaves", desc: "Allows the employee to submit their own leave requests." },
+                                { id: "assign_task", label: "Assign Tasks", desc: "Can create and assign tasks to other colleagues." },
+                                { id: "allocate_leave", label: "Allocate Leaves (Admin)", desc: "Can grant leave days to other employees." },
+                                { id: "approve_leave", label: "Approve Leaves (Admin)", desc: "Can approve or reject others' leave requests." },
+                                { id: "view_payroll", label: "View Payroll", desc: "Can view payroll and salary records." },
+                                { id: "manage_employees", label: "Employee Directory Admin", desc: "Can onboard new employees and manage permissions." },
                             ].map(perm => (
                                 <div key={perm.id} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => togglePermission(perm.id)}>
                                     <div className="pt-0.5">

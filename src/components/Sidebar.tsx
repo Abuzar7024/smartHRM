@@ -27,7 +27,8 @@ import {
     UserPlus,
     Wallet,
     FileCog,
-    Megaphone
+    Megaphone,
+    Brain
 } from "lucide-react";
 import { useState } from "react";
 
@@ -56,13 +57,13 @@ export function Sidebar() {
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
         { name: "Employees", href: "/dashboard/employees", icon: Users },
         { name: "Teams", href: "/dashboard/teams", icon: UsersRound },
+        { name: "AI Insights", href: "/dashboard/ai", icon: Brain },
         { name: "Hierarchy", href: "/dashboard/hierarchy", icon: Network },
         { name: "Chat", href: "/dashboard/chat", icon: MessageSquare, badge: unreadChats },
         { name: "Assign Task", href: "/dashboard/tasks/assign", icon: UserPlus },
         { name: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
         { name: "Profile Requests", href: "/dashboard/profile-requests", icon: User, badge: pendingProfileUpdates },
         { name: "Employee Documents", href: "/dashboard/documents", icon: FileText },
-        { name: "Performance", href: "/dashboard/performance", icon: BarChart3 },
         { name: "Payroll", href: "/dashboard/payroll", icon: CreditCard, badge: pendingPayslipRequests },
         { name: "Leaves", href: "/dashboard/leaves", icon: CalendarDays },
         { name: "Billing", href: "/dashboard/billing", icon: Wallet },
@@ -145,7 +146,16 @@ export function Sidebar() {
                                 >
                                     {/* Icon with badge dot when collapsed */}
                                     <div className="relative flex-shrink-0">
-                                        <link.icon className={cn("w-[18px] h-[18px] transition-transform", isActive ? "text-white" : "group-hover:scale-110")} />
+                                        <div className={cn(
+                                            "relative",
+                                            link.name === "AI Insights" ? "p-1 rounded-lg bg-gradient-to-tr from-[#4285F4] via-[#9b72cb] to-[#d96570] shadow-lg shadow-indigo-500/20" : ""
+                                        )}>
+                                            <link.icon className={cn(
+                                                "w-[18px] h-[18px] transition-transform",
+                                                isActive ? "text-white" : "group-hover:scale-110",
+                                                link.name === "AI Insights" ? "text-white" : ""
+                                            )} />
+                                        </div>
                                         {collapsed && badgeCount > 0 && (
                                             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border border-[#0f172a] text-[8px] text-white font-bold flex items-center justify-center">
                                                 {badgeCount > 9 ? "9" : badgeCount}

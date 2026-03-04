@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch, Timestamp, setDoc } from "firebase/firestore";
 import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
+import type { AppPermission } from "@/lib/permissions";
 
 export type Employee = {
     id?: string;
@@ -39,7 +40,7 @@ export type Employee = {
     insuranceOpted?: boolean;
     insuranceAmount?: string;
 };
-export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
+export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; halfDayPeriod?: "First Half" | "Second Half"; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
 export type Attendance = { id?: string; empEmail: string; type: "Clock In" | "Clock Out" | "Break Start" | "Break End"; timestamp: string };
 export type TaskActivity = { type: string; user: string; timestamp: string; detail?: string };
@@ -73,7 +74,7 @@ export type Team = { id?: string; name: string; leaderEmail: string; memberEmail
 export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; companyName?: string; replyToId?: string; reaction?: string; };
 export type Job = { id?: string; title: string; department: string; applicants: number; type: string; postedAt: string; status: "Active" | "Closed" };
 export type ProfileUpdateRequest = { id?: string; empId: string; empEmail: string; empName: string; fields: Partial<Employee>; status: "Pending" | "Approved" | "Rejected"; requestedAt: string; companyName?: string; };
-export type LeaveBalance = { id?: string; empEmail: string; type: string; balance: number; companyName?: string };
+export type LeaveBalance = { id?: string; empEmail: string; type: string; balance: number; year: number; companyName?: string };
 export type PayslipRequest = { id?: string; empEmail: string; empName: string; month: string; status: "Pending" | "Fulfilled"; requestedAt: string; companyName?: string };
 export type Announcement = { id?: string; title: string; message: string; createdAt: string; authorName: string; companyName?: string; type: "News" | "Update" | "Event" | "Urgent"; startTime?: string; endTime?: string };
 
@@ -107,6 +108,7 @@ interface AppContextType {
     leaveBalances: LeaveBalance[];
     addLeaveBalance: (balance: Omit<LeaveBalance, "id" | "companyName">) => Promise<void>;
     bulkAddLeaveBalances: (balances: Omit<LeaveBalance, "id" | "companyName">[]) => Promise<void>;
+    bulkDeleteLeaveBalances: (ids: string[]) => Promise<void>;
     updateLeaveBalance: (id: string, amount: number) => Promise<void>;
     deleteLeaveBalance: (id: string) => Promise<void>;
 
@@ -165,6 +167,8 @@ interface AppContextType {
     markChatRead: (myEmail: string, contactEmail: string) => Promise<void>;
     chatReadTimestamps: Record<string, number>; // key: contactEmail, value: ms timestamp
     uploadProfileImage: (file: File) => Promise<void>;
+    /** Check if the currently logged-in user has a specific permission. */
+    hasPermission: (perm: AppPermission) => boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -253,14 +257,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 setAttendance(attData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Attendance Error Setup:", error.message));
 
-            const unsubTasks = onSnapshot(
-                role === "employer"
-                    ? query(collection(db, "tasks"), where("companyName", "==", companyName))
-                    : query(collection(db, "tasks"), where("companyName", "==", companyName), where("assigneeEmails", "array-contains", user?.email)),
-                (snapshot) => {
-                    const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-                    setTasks(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-                }, (error) => console.log("Firebase Tasks Error Setup:", error.message));
+            const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("companyName", "==", companyName)), (snapshot) => {
+                const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                setTasks(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            }, (error) => console.log("Firebase Tasks Error Setup:", error.message));
 
             const unsubDocuments = onSnapshot(
                 role === "employer"
@@ -550,6 +550,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    // Helper to check if current user has a specific permission
+    const hasPermission = (perm: AppPermission): boolean => {
+        // Employers have all permissions by default
+        if (role?.toLowerCase() === "employer") return true;
+        // Everyone is allowed to request their own leave
+        if (perm === "request_leave") return true;
+        const emp = employees.find((e: any) => e.email === user?.email);
+        return emp?.permissions?.includes(perm) ?? false;
+    };
+
     const updateEmployee = async (id: string, updates: Partial<Employee>) => {
         try {
             if (id === "employer_profile") {
@@ -563,6 +573,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const requestLeave = async (leave: Leave) => {
+        // Permission check for requesting leaves
+        if (!hasPermission("request_leave")) {
+            const err = new Error("Permission denied: request_leave");
+            (err as any).status = 403;
+            throw err;
+        }
         try {
             await addDoc(collection(db, "leaves"), { ...leave, companyName });
             // Create notification for Medical leaves mostly, or all leaves for employers
@@ -576,6 +592,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
         } catch (e) {
             console.error("Error requesting leave: ", e);
+            throw e; // Rethrow so the UI knows it failed
         }
     };
 
@@ -782,6 +799,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const addTask = async (task: Omit<Task, "id" | "createdAt" | "companyName" | "status" | "history" | "comments" | "attachments">) => {
         try {
+            const myEmp = employees.find(e => e.email === user?.email);
+            const canAssignTasks = role?.toLowerCase() === "employer" || (myEmp?.permissions || []).includes("assign_tasks");
+            if (!canAssignTasks) {
+                toast.error("Permission Denied", { description: "You are not authorized to assign tasks." });
+                throw new Error("Permission Denied. Unauthorized task assignment attempt.");
+            }
             // If it's a team assignment, we should automatically include all team members
             let finalAssigneeEmails = [...task.assigneeEmails];
             if (task.assignmentType === "Team" && task.teamId) {
@@ -818,6 +841,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     companyName: companyName
                 });
             }
+            toast.success("Task assigned successfully", { description: `Task "${task.title}" has been created and notifications sent.` });
         } catch (e) {
             console.error("Error adding task: ", e);
         }
@@ -1005,11 +1029,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const addLeaveBalance = async (balance: Omit<LeaveBalance, "id" | "companyName">) => {
+        // Permission check for allocating leave balances
+        if (!hasPermission("allocate_leave")) {
+            const err = new Error("Permission denied: allocate_leave");
+            // @ts-ignore – attach status for downstream handling
+            (err as any).status = 403;
+            throw err;
+        }
         try {
-            await addDoc(collection(db, "leave_balances"), { ...balance, companyName });
+            const existing = leaveBalances.find(b => b.empEmail === balance.empEmail && b.type === balance.type && b.year === balance.year);
+            if (existing) {
+                await updateDoc(doc(db, "leave_balances", existing.id!), {
+                    balance: existing.balance + balance.balance
+                });
+            } else {
+                await addDoc(collection(db, "leave_balances"), { ...balance, companyName });
+            }
+
             await addDoc(collection(db, "notifications"), {
-                title: "💰 Leave Balance Created",
-                message: `A new leave balance of ${balance.balance} days has been added for ${balance.type}.`,
+                title: "💰 Leave Balance Updated",
+                message: `Your ${balance.type} balance has been updated (+${balance.balance} days).`,
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: balance.empEmail,
@@ -1030,20 +1069,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             });
             await batch.commit();
 
-            // Send one notification for the total
-            const total = balances.reduce((acc, b) => acc + b.balance, 0);
-            await addDoc(collection(db, "notifications"), {
-                title: "📅 Leave Balances Allocated",
-                message: `Total ${total} days of annual leave have been allocated across ${balances.length} categories.`,
-                timestamp: new Date().toISOString(),
-                isRead: false,
-                targetEmail: balances[0].empEmail,
-                targetRole: "employee",
-                companyName
-            });
+            toast.success("Balances Allocated", { description: "Leaves have been credited to the specified personnel." });
         } catch (e) {
             console.error(e);
             toast.error("Failed to allocate leaves");
+        }
+    };
+
+    const bulkDeleteLeaveBalances = async (ids: string[]) => {
+        try {
+            const batch = writeBatch(db);
+            ids.forEach(id => {
+                batch.delete(doc(db, "leave_balances", id));
+            });
+            await batch.commit();
+            toast.success("Allocations Cleared");
+        } catch (e) {
+            console.error(e);
+            toast.error("Deletion failed");
         }
     };
 
@@ -1060,11 +1103,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!leave) return;
 
         const deduction = leave.days || 1;
-        const targetType = leave.type === "Half Day Leave" ? "Casual Leave" : leave.type;
-        const balanceRecord = leaveBalances.find(b => b.empEmail === leave.empEmail && b.type === targetType);
 
-        if (!balanceRecord || balanceRecord.balance < deduction) {
-            toast.error("Insufficient Balance", { description: `Employee only has ${balanceRecord?.balance || 0} days remaining for ${targetType}.` });
+        const requestYear = new Date(leave.from).getFullYear();
+        const balanceRecord = leaveBalances.find(b => b.empEmail === leave.empEmail && b.type === leave.type && b.year === requestYear);
+
+        if (!balanceRecord || (balanceRecord.balance < deduction)) {
+            toast.error("Insufficient Credits", { description: `Employee has ${balanceRecord?.balance || 0} days available for ${leave.type} in ${requestYear}.` });
             return;
         }
 
@@ -1074,7 +1118,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             // 1. Update Leave Status
             batch.update(doc(db, "leaves", leaveId), { status: "Approved" });
 
-            // 2. Deduct Balance
+            // 2. Strict Deduction
             batch.update(doc(db, "leave_balances", balanceRecord.id!), {
                 balance: Number((balanceRecord.balance - deduction).toFixed(2))
             });
@@ -1377,7 +1421,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             approveRegistration, rejectRegistration, pendingRegistrations,
             profileUpdates, requestProfileUpdate, approveProfileUpdate, rejectProfileUpdate,
             leaves, requestLeave, updateLeaveStatus, approveLeaveRequest, rejectLeaveRequest,
-            leaveBalances, addLeaveBalance, bulkAddLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
+            leaveBalances, addLeaveBalance, bulkAddLeaveBalances, bulkDeleteLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
             payroll, processPayroll, processSinglePayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
             announcements, addAnnouncement, deleteAnnouncement,
             attendance, clockIn, clockOut, takeBreak, endBreak,
@@ -1388,7 +1432,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             jobs, addJob, updateJobStatus,
             teams, createTeam, updateTeam, deleteTeam,
             chatMessages, sendMessage, deleteMessage, clearChat, reactToMessage, markChatRead, chatReadTimestamps,
-            uploadProfileImage
+            uploadProfileImage,
+            hasPermission
         }}>
             {children}
         </AppContext.Provider>

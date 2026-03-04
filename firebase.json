@@ -3,6 +3,9 @@
         "rules": "firestore.rules",
         "indexes": "firestore.indexes.json"
     },
+    "storage": {
+        "rules": "storage.rules"
+    },
     "hosting": {
         "site": "smarthr-96738-d6ab8",
         "public": "public",

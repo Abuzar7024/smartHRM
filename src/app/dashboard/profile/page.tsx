@@ -511,8 +511,8 @@ export default function ProfilePage() {
                                                                             onChange={(e) => {
                                                                                 const file = e.target.files?.[0];
                                                                                 if (file) {
-                                                                                    if (file.size > 5 * 1024 * 1024) {
-                                                                                        toast.error("File Too Large", { description: "Maximum file size is 5MB." });
+                                                                                    if (file.size > 700 * 1024) {
+                                                                                        toast.error("File Too Large", { description: "Maximum file size for database storage is 700KB." });
                                                                                         return;
                                                                                     }
                                                                                     const reader = new FileReader();

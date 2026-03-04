@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useApp, Task, Employee } from "@/context/AppContext";
+import { usePermission } from "@/hooks/usePermission";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -17,6 +18,7 @@ export default function TasksPage() {
     const { role, user } = useAuth();
     const router = useRouter();
     const { tasks, employees, teams, updateTaskStatus, deleteTask, updateTask, addTaskComment, addTaskAttachment, manageTaskTeam } = useApp();
+    const { can } = usePermission();
     const [search, setSearch] = useState("");
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
     const [commentText, setCommentText] = useState("");
@@ -102,13 +104,15 @@ export default function TasksPage() {
                         >
                             Overdue
                         </Button>
-                        <Button
-                            onClick={() => router.push("/dashboard/tasks/assign")}
-                            className="h-9 rounded-xl bg-slate-900 border-none text-white font-bold text-xs px-4 shadow-lg shadow-slate-200 flex items-center gap-2 hover:bg-indigo-600 transition-all active:scale-95"
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Assign Task</span>
-                        </Button>
+                        {can("assign_task") && (
+                            <Button
+                                onClick={() => router.push("/dashboard/tasks/assign")}
+                                className="h-9 rounded-xl bg-slate-900 border-none text-white font-bold text-xs px-4 shadow-lg shadow-slate-200 flex items-center gap-2 hover:bg-indigo-600 transition-all active:scale-95"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Assign Task</span>
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

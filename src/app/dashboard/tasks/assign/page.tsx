@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useApp, Employee } from "@/context/AppContext";
+import { usePermission } from "@/hooks/usePermission";
+import { PermissionGate } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -44,6 +46,7 @@ export default function AssignTaskPage() {
     const router = useRouter();
     const { user, role } = useAuth();
     const { employees, teams, addTask, tasks } = useApp();
+    const { can } = usePermission();
     const [currentStep, setCurrentStep] = useState(0);
     const [isOrchestrating, setIsOrchestrating] = useState(false);
 
@@ -66,11 +69,26 @@ export default function AssignTaskPage() {
     const isTeamLeader = teams.some(t => t.leaderEmail === user?.email);
     const myLedTeam = teams.find(t => t.leaderEmail === user?.email);
 
-    const assignableEmployees = (role?.toLowerCase() === "employer" || (myEmp?.permissions || []).includes("assign_tasks"))
-        ? employees
-        : myLedTeam
-            ? employees.filter(e => (myLedTeam.memberEmails || []).includes(e.email))
-            : [];
+    // RBAC – use central permission hook
+    if (!can("assign_task")) {
+        return (
+            <div className="h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50/30 p-6">
+                <div className="text-center p-8 bg-white rounded-[2rem] shadow-xl border border-slate-100 max-w-sm w-full">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <UsersRound className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900 mb-2">Access Denied</h2>
+                    <p className="text-sm font-medium text-slate-500 mb-8">You do not have the <code className="bg-slate-100 px-1 rounded">assign_task</code> permission.</p>
+                    <Button onClick={() => router.push("/dashboard/tasks")} className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold hover:bg-black transition-all">
+                        Return to Tasks
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    // At this point can("assign_task") passed, so all employees are assignable
+    const assignableEmployees = employees;
 
     const handleNext = () => {
         if (currentStep === 0 && !form.title) {
@@ -394,16 +412,26 @@ export default function AssignTaskPage() {
 
                                                 {currentStep === 2 && (
                                                     <div className="space-y-6">
-                                                        <div className="grid grid-cols-2 gap-6">
+                                                        <div className="space-y-6">
                                                             <div className="space-y-2">
                                                                 <Label className="text-xs font-black text-slate-400 uppercase tracking-widest">Functional Category</Label>
-                                                                <select
-                                                                    className="w-full h-12 rounded-2xl bg-slate-50 border-none text-sm font-bold px-4 focus:ring-4 focus:ring-indigo-100 appearance-none transition-all"
-                                                                    value={form.category}
-                                                                    onChange={e => setForm({ ...form, category: e.target.value })}
-                                                                >
-                                                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                                                </select>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {CATEGORIES.map(c => (
+                                                                        <button
+                                                                            key={c}
+                                                                            type="button"
+                                                                            onClick={() => setForm({ ...form, category: c })}
+                                                                            className={cn(
+                                                                                "px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2",
+                                                                                form.category === c
+                                                                                    ? (c === "Urgent" ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm" : "bg-indigo-50 border-indigo-200 text-indigo-600 shadow-sm")
+                                                                                    : "bg-slate-50 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200 hover:bg-slate-100"
+                                                                            )}
+                                                                        >
+                                                                            {c}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                             <div className="space-y-2">
                                                                 <Label className="text-xs font-black text-slate-400 uppercase tracking-widest">Execution Priority</Label>
@@ -411,6 +439,7 @@ export default function AssignTaskPage() {
                                                                     {PRIORITIES.map(p => (
                                                                         <button
                                                                             key={p}
+                                                                            type="button"
                                                                             onClick={() => setForm({ ...form, priority: p as any })}
                                                                             className={cn(
                                                                                 "flex-1 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2",

@@ -304,6 +304,27 @@ export default function DashboardLayout({
 
     return (
         <div className="flex bg-slate-50 h-screen w-full relative overflow-hidden">
+            {/* ── Pending Leave Alert (Global Top Center) ── */}
+            <AnimatePresence>
+                {leaves.some(l => l.empEmail === user?.email && l.status === "Pending") && (
+                    <motion.div
+                        initial={{ y: -100, x: "-50%", opacity: 0 }}
+                        animate={{ y: 20, x: "-50%", opacity: 1 }}
+                        exit={{ y: -100, x: "-50%", opacity: 0 }}
+                        className="fixed left-1/2 z-[100] w-auto"
+                    >
+                        <div className="bg-white border border-slate-200 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 border-b-4 border-b-amber-500/50">
+                            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shadow-inner">
+                                <Hourglass className="w-5 h-5 animate-spin-slow" />
+                            </div>
+                            <div className="min-w-0 pr-4">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Request Status</p>
+                                <p className="text-xs font-black text-slate-900 leading-none">Your leave application is <span className="text-amber-600">Pending Approval</span></p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             {/* Sidebar with mobile state */}
             <div className={cn(
                 "fixed inset-y-0 left-0 z-50 flex-shrink-0 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0",

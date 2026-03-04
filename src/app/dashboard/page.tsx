@@ -49,22 +49,27 @@ export default function DashboardOverview() {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        if (file.size > 700 * 1024) {
+            toast.error("File Too Large", { description: "Maximum file size for database storage is 700KB. Compress your image or use PDF." });
+            return;
+        }
+
         setUploadingDocId(docId);
-        const storageRef = ref(storage, `documents/${docId}/${file.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, file);
 
         toast.promise(
             new Promise((resolve, reject) => {
-                uploadTask.on(
-                    "state_changed",
-                    null,
-                    (error) => reject(error),
-                    async () => {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        await uploadDocument(docId, downloadURL);
-                        resolve(downloadURL);
+                const reader = new FileReader();
+                reader.onerror = () => reject("Failed to read file.");
+                reader.onloadend = async () => {
+                    try {
+                        const base64Url = reader.result as string;
+                        await uploadDocument(docId, base64Url);
+                        resolve(base64Url);
+                    } catch (err) {
+                        reject(err);
                     }
-                );
+                };
+                reader.readAsDataURL(file);
             }),
             {
                 loading: 'Uploading document securely to cloud...',
@@ -72,9 +77,10 @@ export default function DashboardOverview() {
                     setUploadingDocId(null);
                     return 'File securely transmitted.';
                 },
-                error: () => {
+                error: (e) => {
                     setUploadingDocId(null);
-                    return 'Failed to upload document.';
+                    console.error("Upload error context", e);
+                    return 'Failed to upload document. Base64 Error or Payload Exceeded.';
                 }
             }
         );
@@ -233,7 +239,8 @@ export default function DashboardOverview() {
                         </a>
                     </div>
                 );
-            })()}
+            })()
+            }
 
             {/* ── Stats + Timeclock grid ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -336,64 +343,66 @@ export default function DashboardOverview() {
             </div>
 
             {/* ── Pending Submissions Panel (Employer only) ── */}
-            {role === "employer" && (() => {
-                const pendingDocs = documents.filter(d => d.status === "Pending");
-                if (pendingDocs.length === 0) return null;
-                return (
-                    <div className="border border-rose-200 bg-rose-50 rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-5 h-5 text-rose-500" />
-                                <h2 className="text-sm font-bold text-rose-800">
-                                    Pending Document Submissions ({pendingDocs.length})
-                                </h2>
+            {
+                role === "employer" && (() => {
+                    const pendingDocs = documents.filter(d => d.status === "Pending");
+                    if (pendingDocs.length === 0) return null;
+                    return (
+                        <div className="border border-rose-200 bg-rose-50 rounded-xl p-5 shadow-sm">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <AlertTriangle className="w-5 h-5 text-rose-500" />
+                                    <h2 className="text-sm font-bold text-rose-800">
+                                        Pending Document Submissions ({pendingDocs.length})
+                                    </h2>
+                                </div>
+                                <span className="text-[10px] font-semibold text-rose-500 uppercase tracking-wider">Awaiting Upload</span>
                             </div>
-                            <span className="text-[10px] font-semibold text-rose-500 uppercase tracking-wider">Awaiting Upload</span>
-                        </div>
-                        <div className="space-y-2">
-                            {pendingDocs.map(doc => {
-                                const emp = employees.find(e => e.email === doc.empEmail);
-                                return (
-                                    <div key={doc.id} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-4 py-3 gap-3">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center font-bold text-rose-600 text-xs flex-shrink-0">
-                                                {(emp?.name || doc.empEmail || "?").charAt(0).toUpperCase()}
+                            <div className="space-y-2">
+                                {pendingDocs.map(doc => {
+                                    const emp = employees.find(e => e.email === doc.empEmail);
+                                    return (
+                                        <div key={doc.id} className="flex items-center justify-between bg-white border border-rose-100 rounded-lg px-4 py-3 gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center font-bold text-rose-600 text-xs flex-shrink-0">
+                                                    {(emp?.name || doc.empEmail || "?").charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-900 truncate">
+                                                        {emp?.name || doc.empEmail.split("@")[0]}
+                                                    </p>
+                                                    <p className="text-xs text-rose-600 font-medium truncate">
+                                                        📄 {doc.title}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-slate-900 truncate">
-                                                    {emp?.name || doc.empEmail.split("@")[0]}
-                                                </p>
-                                                <p className="text-xs text-rose-600 font-medium truncate">
-                                                    📄 {doc.title}
-                                                </p>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {doc.requestedAt && (
+                                                    <span className="text-[10px] text-slate-400 hidden sm:block">
+                                                        Requested {new Date(doc.requestedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                                                    </span>
+                                                )}
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 text-[11px] bg-rose-500 hover:bg-rose-600 text-white font-bold px-3"
+                                                    onClick={async () => {
+                                                        await sendDocumentReminder(doc.empEmail, doc.title);
+                                                        toast.success("Reminder Sent", {
+                                                            description: `${emp?.name || doc.empEmail} has been notified about "${doc.title}"`,
+                                                        });
+                                                    }}
+                                                >
+                                                    🔔 Remind
+                                                </Button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            {doc.requestedAt && (
-                                                <span className="text-[10px] text-slate-400 hidden sm:block">
-                                                    Requested {new Date(doc.requestedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                                                </span>
-                                            )}
-                                            <Button
-                                                size="sm"
-                                                className="h-7 text-[11px] bg-rose-500 hover:bg-rose-600 text-white font-bold px-3"
-                                                onClick={async () => {
-                                                    await sendDocumentReminder(doc.empEmail, doc.title);
-                                                    toast.success("Reminder Sent", {
-                                                        description: `${emp?.name || doc.empEmail} has been notified about "${doc.title}"`,
-                                                    });
-                                                }}
-                                            >
-                                                🔔 Remind
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                );
-            })()}
+                    );
+                })()
+            }
 
             {/* ── Main content grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

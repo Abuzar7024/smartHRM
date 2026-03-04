@@ -116,7 +116,9 @@
   }
 
   /* ─── Global input aesthetics ───────────────────── */
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-family: inherit;
   }
 
@@ -173,7 +175,39 @@
   background: hsl(var(--primary) / 0.3);
 }
 
-/* ─── Selection ─────────────────────────────────── */
+/* ─── Custom Animations ─────────────────────────── */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+
+@keyframes pulse-soft {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+
 ::selection {
   background: hsl(var(--primary) / 0.15);
   color: hsl(var(--foreground));

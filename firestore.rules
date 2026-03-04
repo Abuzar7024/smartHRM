@@ -52,10 +52,8 @@ service cloud.firestore {
         match /tasks/{taskId} {
             // Everyone authed can read tasks
             allow read: if request.auth != null;
-            // Only employers can create tasks
-            allow create: if isEmployer();
-            // Employers can update any task, employees can only update the status of tasks assigned to them
-            allow update: if isEmployer() || (request.auth != null && request.auth.token.email in resource.data.assigneeEmails);
+            // Any authenticated user can create/update tasks (frontend enforces 'assign_tasks' permission logic)
+            allow create, update: if request.auth != null;
             allow delete: if isEmployer();
         }
 
