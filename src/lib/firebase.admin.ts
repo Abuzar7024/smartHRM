@@ -14,14 +14,26 @@ if (!admin.apps.length) {
         let privateKey = getSafeEnv('FIREBASE_PRIVATE_KEY');
 
         if (privateKey) {
-            privateKey = privateKey.replace(/\\n/g, '\n');
+            // More aggressive cleanup for Vercel/Cloud env vars
+            privateKey = privateKey
+                .replace(/^["']|["']$/g, '') // Remove surrounding quotes globally
+                .replace(/\\n/g, '\n')       // Convert escaped newlines
+                .trim();                     // Remove any stray whitespace/newlines at ends
+
+            // Ensure internal actual newlines exist if it's all one line
+            if (!privateKey.includes('\n') && privateKey.includes(' ')) {
+                // This is rare but helps if the user pasted it with spaces instead of newlines
+                privateKey = privateKey.replace(/ /g, '\n');
+            }
         }
 
         console.log("Firebase Admin Debug:", {
             projectId,
             clientEmail: clientEmail ? `${clientEmail.substring(0, 5)}...` : 'MISSING',
             hasPrivateKey: !!privateKey,
-            privateKeyStart: privateKey ? privateKey.substring(0, 30) : 'N/A'
+            privateKeyLength: privateKey?.length,
+            privateKeyHeader: privateKey?.substring(0, 25),
+            privateKeyFooter: privateKey?.substring(privateKey.length - 25)
         });
 
         if (!projectId || !clientEmail || !privateKey) {
