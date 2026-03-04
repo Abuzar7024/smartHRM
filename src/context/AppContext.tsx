@@ -237,9 +237,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     setLeaves(leavesData.sort((a, b) => new Date(b.from).getTime() - new Date(a.from).getTime()));
                 }, (error) => console.log("Firebase Leaves Error Setup:", error.message));
 
-            const unsubPayroll = onSnapshot(query(collection(db, "payroll"), where("companyName", "==", companyName)), (snapshot) => {
-                setPayroll(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
-            }, (error) => console.log("Firebase Payroll Error Setup:", error.message));
+            const unsubPayroll = onSnapshot(
+                role === "employer"
+                    ? query(collection(db, "payroll"), where("companyName", "==", companyName))
+                    : query(collection(db, "payroll"), where("companyName", "==", companyName), where("empEmail", "==", user?.email)),
+                (snapshot) => {
+                    setPayroll(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
+                }, (error) => console.log("Firebase Payroll Error Setup:", error.message)
+            );
 
             const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName)), (snapshot) => {
                 const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
