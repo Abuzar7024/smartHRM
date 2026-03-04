@@ -97,21 +97,23 @@ export default function PayrollPage() {
                     {employees.filter(e => e.status === "Active").map(emp => {
                         const hasPendingRequest = payslipRequests.some(r => r.empEmail === emp.email && r.status === "Pending");
                         return (
-                            <Card key={emp.id} className={cn("cursor-pointer transition-all relative overflow-hidden", hasPendingRequest ? "border-indigo-300 shadow-md shadow-indigo-100" : "hover:border-slate-300")} onClick={() => openDisburseModal(emp)}>
-                                {hasPendingRequest && (
-                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10 bg-rose-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-md shadow-sm animate-pulse">
-                                        <MessageSquare className="w-2.5 h-2.5" />
-                                        PENDING
+                            <Card key={emp.id} className={cn("cursor-pointer transition-all overflow-hidden", hasPendingRequest ? "border-amber-300 shadow-md shadow-amber-100" : "hover:border-slate-300")} onClick={() => openDisburseModal(emp)}>
+                                <CardContent className="p-4 flex items-center justify-between gap-3 border-b-0 overflow-hidden">
+                                    <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                                        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0", hasPendingRequest ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600")}>
+                                            {emp.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="overflow-hidden min-w-0">
+                                            <p className="text-sm font-bold text-slate-900 truncate">{emp.name}</p>
+                                            <p className="text-xs text-slate-500 truncate">{emp.department}</p>
+                                        </div>
                                     </div>
-                                )}
-                                <CardContent className="p-4 flex items-center gap-3 border-b-0 relative">
-                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0", hasPendingRequest ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-600")}>
-                                        {emp.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="text-sm font-bold text-slate-900 truncate pr-4">{emp.name}</p>
-                                        <p className="text-xs text-slate-500 truncate">{emp.department}</p>
-                                    </div>
+                                    {hasPendingRequest && (
+                                        <div className="shrink-0 flex items-center gap-1 bg-amber-500 text-white font-bold text-[9px] px-2 py-1 rounded-md shadow-sm animate-pulse">
+                                            <MessageSquare className="w-3 h-3" />
+                                            <span className="hidden sm:inline-block">PENDING</span>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         );
