@@ -16,8 +16,8 @@ import { CardContainer, SectionHeader, Modal } from "@/components/shared/common"
 import { StatusBadge, DataTable } from "@/components/shared/tables";
 
 export default function ProfilePage() {
-    const { user, role, companyName } = useAuth();
-    const { employees, updateEmployee, requestProfileUpdate, documents, uploadDocument, uploadProfileImage } = useApp();
+    const { user, role, companyName, logout } = useAuth();
+    const { employees, updateEmployee, requestProfileUpdate, documents, uploadDocument, uploadProfileImage, deleteCompanyCascade } = useApp();
     const searchParams = useSearchParams();
     const targetId = searchParams.get("id");
 
@@ -122,9 +122,17 @@ export default function ProfilePage() {
 
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const handleDeleteRecord = async () => {
-        // Implement deletion logic
-        setShowDeleteDialog(false);
-        toast.success("Record Purged", { description: "Employee history removed from registry." });
+        if (!isAdmin) return;
+        try {
+            await deleteCompanyCascade();
+            setShowDeleteDialog(false);
+            // Log out the user after company deletion
+            setTimeout(() => {
+                logout();
+            }, 2000);
+        } catch (err) {
+            console.error("Purge failed:", err);
+        }
     };
 
     const mandatoryFields = ['phone', 'address', 'govIdNumber', 'panCard', 'bankName', 'accountNumber'];

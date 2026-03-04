@@ -167,6 +167,7 @@ interface AppContextType {
     markChatRead: (myEmail: string, contactEmail: string) => Promise<void>;
     chatReadTimestamps: Record<string, number>; // key: contactEmail, value: ms timestamp
     uploadProfileImage: (file: File) => Promise<void>;
+    deleteCompanyCascade: () => Promise<void>;
     /** Check if the currently logged-in user has a specific permission. */
     hasPermission: (perm: AppPermission) => boolean;
 }
@@ -426,7 +427,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             }
 
             // Tasks assigned to this employee
-            const tasksQ = query(collection(db, "tasks"), where("assigneeEmail", "==", empEmail));
+            const tasksQ = query(collection(db, "tasks"), where("assigneeEmails", "array-contains", empEmail));
             const tasksSnap = await getDocs(tasksQ);
             tasksSnap.docs.forEach(d => batch.delete(d.ref));
 
@@ -441,6 +442,58 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await batch.commit();
         } catch (e) {
             console.error("Error deleting employee cascade:", e);
+            throw e;
+        }
+    };
+
+    // Full cascade delete for the entire company
+    const deleteCompanyCascade = async () => {
+        if (!companyName || role !== "employer") {
+            toast.error("Unauthorized Action", { description: "Only top-level administration can initiate total purge." });
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            const collectionsToPurge = [
+                "employees", "leaves", "payroll", "attendance", "tasks",
+                "documents", "notifications", "jobs", "teams", "chat_messages",
+                "leave_balances", "profile_updates", "payslip_requests", "announcements"
+            ];
+
+            for (const col of collectionsToPurge) {
+                const q = query(collection(db, col), where("companyName", "==", companyName));
+                const snap = await getDocs(q);
+                snap.docs.forEach(d => batch.delete(d.ref));
+            }
+
+            // Delete company settings
+            batch.delete(doc(db, "companySettings", companyName));
+
+            // Finally, clean up roles in the USERS collection for all emails associated with this company
+            const userEmails = employees.map(e => e.email);
+            if (userEmails.length > 0) {
+                // Split emails into chunks because "where in" supports at most 10/30 depending on implementation
+                // but here it's easier to just iterate since we need to update each doc by its UID or query
+                for (const email of userEmails) {
+                    const userQ = query(collection(db, "users"), where("email", "==", email));
+                    const userSnap = await getDocs(userQ);
+                    userSnap.docs.forEach(d => {
+                        batch.update(d.ref, { companyName: null, role: "employee" });
+                    });
+                }
+            }
+
+            // Also update the current employer user
+            if (user?.uid) {
+                batch.update(doc(db, "users", user.uid), { companyName: null, role: null });
+            }
+
+            await batch.commit();
+            toast.success("Total Purge Complete", { description: "Organization identity and all associated assets have been removed." });
+        } catch (e) {
+            console.error("Error during company cascade delete:", e);
+            toast.error("Purge Interrupted", { description: "A system error occurred during asset removal." });
             throw e;
         }
     };
@@ -1432,7 +1485,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             jobs, addJob, updateJobStatus,
             teams, createTeam, updateTeam, deleteTeam,
             chatMessages, sendMessage, deleteMessage, clearChat, reactToMessage, markChatRead, chatReadTimestamps,
-            uploadProfileImage,
+            uploadProfileImage, deleteCompanyCascade,
             hasPermission
         }}>
             {children}
