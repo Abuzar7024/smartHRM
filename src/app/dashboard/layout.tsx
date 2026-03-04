@@ -96,10 +96,14 @@ export default function DashboardLayout({
         }
     }, [isClient, user, authLoading, router]);
 
-    const myNotifications = useMemo(() => notifications.filter(
-        n => (role === "employer" && n.targetRole === "employer") ||
-            (role === "employee" && (n.targetEmail === user?.email || n.targetRole === "employee"))
-    ), [notifications, role, user?.email]);
+    const myNotifications = useMemo(() => notifications.filter(n => {
+        if (role === "employer" && n.targetRole === "employer") return true;
+        if (role === "employee" && n.targetRole === "employee") {
+            if (n.targetEmail) return n.targetEmail === user?.email;
+            return true;
+        }
+        return false;
+    }), [notifications, role, user?.email]);
 
     const unreadCount = myNotifications.filter(n => !n.isRead).length;
 
