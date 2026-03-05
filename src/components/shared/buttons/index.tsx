@@ -44,7 +44,7 @@ export function SecondaryButton({ children, className, loading, icon, ...props }
     );
 }
 
-export function IconButton({ children, className, loading, ...props }: ButtonProps) {
+export function IconButton({ children, className, loading, icon, ...props }: ButtonProps) {
     return (
         <Button
             variant="ghost"
@@ -56,7 +56,7 @@ export function IconButton({ children, className, loading, ...props }: ButtonPro
             disabled={loading}
             {...props}
         >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (icon || children)}
         </Button>
     );
 }

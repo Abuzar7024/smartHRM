@@ -60,6 +60,10 @@ export default function LeavesPage() {
     const [currentCalDate, setCurrentCalDate] = useState(new Date());
     const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
     const [empSearch, setEmpSearch] = useState("");
+    const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+    const [visibleCount, setVisibleCount] = useState(12);
+    const [filterRole, setFilterRole] = useState("All Roles");
+    const [filterDept, setFilterDept] = useState("All Depts");
 
     // Helpers
     const currentYear = new Date().getFullYear();
@@ -346,120 +350,224 @@ export default function LeavesPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-2">
-                <CardContainer>
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2.5 rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
-                                <Users className="w-5 h-5" />
-                            </div>
-                            <StatusBadge status="Staff Strength" variant="corporate" />
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Active Workforce</p>
-                        <h3 className="text-2xl font-black text-slate-900">{employees.filter(e => e.status === "Active").length} <span className="text-sm font-medium text-slate-400">Members</span></h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
+                <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="p-2 rounded-xl bg-slate-900 text-white"><Users className="w-4 h-4" /></div>
+                    <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Staff</p>
+                        <h3 className="text-xl font-black text-slate-900">{employees.length}</h3>
                     </div>
-                </CardContainer>
-
-                <CardContainer onClick={() => setIsAbsenceModalOpen(true)} className="cursor-pointer">
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-                                <SunMoon className="w-5 h-5" />
-                            </div>
-                            <StatusBadge status="Off Today" variant="corporate" />
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Physical Absences</p>
-                        <h3 className="text-2xl font-black text-slate-900">
-                            {leaves.filter(l => l.status === "Approved" &&
-                                new Date().toISOString().split('T')[0] >= l.from &&
-                                new Date().toISOString().split('T')[0] <= l.to
-                            ).length} <span className="text-sm font-medium text-slate-400">Staff</span>
-                        </h3>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600"><SunMoon className="w-4 h-4" /></div>
+                    <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Off Today</p>
+                        <h3 className="text-xl font-black text-slate-900">{leaves.filter(l => l.status === "Approved" && new Date().toISOString().split('T')[0] >= l.from && new Date().toISOString().split('T')[0] <= l.to).length}</h3>
                     </div>
-                </CardContainer>
-
-                <CardContainer>
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
-                                <AlertCircle className="w-5 h-5" />
-                            </div>
-                            <StatusBadge status="Attention" variant="corporate" />
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Pending Authorizations</p>
-                        <h3 className="text-2xl font-black text-slate-900">{leaves.filter(l => l.status === "Pending").length} <span className="text-sm font-medium text-slate-400">Total</span></h3>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600"><AlertCircle className="w-4 h-4" /></div>
+                    <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Pending</p>
+                        <h3 className="text-xl font-black text-slate-900">{leaves.filter(l => l.status === "Pending").length}</h3>
                     </div>
-                </CardContainer>
-
-                <CardContainer className="bg-slate-900 text-white border-none">
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2.5 rounded-xl bg-white/10 text-slate-200">
-                                <Activity className="w-5 h-5" />
-                            </div>
-                            <StatusBadge status="Optimal" variant="corporate" className="bg-white/10 text-slate-100 border-none" />
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Org Attendance Rate</p>
-                        <h3 className="text-2xl font-black text-white">98.4% <span className="text-sm font-medium text-slate-500">Avg</span></h3>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-slate-900 text-white rounded-2xl border-none shadow-lg">
+                    <div className="p-2 rounded-xl bg-white/10 text-white"><Activity className="w-4 h-4" /></div>
+                    <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Engagement</p>
+                        <h3 className="text-xl font-black text-white">98%</h3>
                     </div>
-                </CardContainer>
+                </div>
             </div>
 
             <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 px-2">
                     <SectionHeader
                         title="Workforce Management"
                         subtitle="Live availability and allocation matrix for all active personnel."
+                        icon={Users}
+                        className="mb-0"
                     />
-                    <div className="w-full md:w-80">
-                        <InputField
-                            icon={<Search className="w-4 h-4 text-slate-400" />}
-                            placeholder="Search personnel by name or role..."
-                            value={empSearch}
-                            onChange={(e) => setEmpSearch(e.target.value)}
-                            className="bg-white border-slate-200"
-                        />
+
+                    <div className="flex flex-wrap items-center gap-4 bg-white/50 backdrop-blur-sm p-2 rounded-[2rem] border border-slate-200">
+                        {/* Search Input */}
+                        <div className="relative min-w-[240px] flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                placeholder="Search personnel..."
+                                value={empSearch}
+                                onChange={(e) => setEmpSearch(e.target.value)}
+                                className="w-full h-10 pl-11 pr-4 bg-white border border-slate-200 rounded-[1.2rem] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            />
+                        </div>
+
+                        {/* Role Filter */}
+                        <select
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                            className="h-10 px-4 bg-white border border-slate-200 rounded-[1.2rem] text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                            <option>All Roles</option>
+                            {Array.from(new Set(employees.map(e => e.role))).map(role => (
+                                <option key={role} value={role}>{role}</option>
+                            ))}
+                        </select>
+
+                        {/* Dept Filter */}
+                        <select
+                            value={filterDept}
+                            onChange={(e) => setFilterDept(e.target.value)}
+                            className="h-10 px-4 bg-white border border-slate-200 rounded-[1.2rem] text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                            <option>All Depts</option>
+                            {Array.from(new Set(employees.map(e => e.department))).filter(Boolean).map(dept => (
+                                <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                        </select>
+
+                        {/* View Switcher */}
+                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button
+                                onClick={() => setViewMode("grid")}
+                                className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    viewMode === "grid" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                )}
+                            >
+                                <Zap className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode("table")}
+                                className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    viewMode === "table" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                )}
+                            >
+                                <Activity className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-2 min-h-[400px]">
-                    {employees
-                        .filter(e => e.status === "Active")
-                        .filter(e =>
-                            e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
-                            e.role.toLowerCase().includes(empSearch.toLowerCase())
-                        )
-                        .map(emp => (
-                            <CardContainer key={emp.id} className="group hover:scale-[1.02] transition-transform">
-                                <div className="p-6 space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
-                                            {emp.name.charAt(0)}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-black text-slate-900 truncate text-sm uppercase tracking-tight">{emp.name}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate">{emp.role}</p>
+                <AnimatePresence mode="wait">
+                    {viewMode === "grid" ? (
+                        <motion.div
+                            key="grid"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 px-2"
+                        >
+                            {employees
+                                .filter(e => e.status === "Active")
+                                .filter(e =>
+                                    (e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
+                                        e.role.toLowerCase().includes(empSearch.toLowerCase())) &&
+                                    (filterRole === "All Roles" || e.role === filterRole) &&
+                                    (filterDept === "All Depts" || e.department === filterDept)
+                                )
+                                .slice(0, visibleCount)
+                                .map(emp => (
+                                    <div key={emp.id} className="group bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                    {emp.name.charAt(0)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="font-black text-slate-900 truncate text-[11px] uppercase tracking-tight">{emp.name}</h4>
+                                                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest truncate">{emp.role}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-right">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Allocated</p>
+                                                    <p className="font-black text-xs text-slate-900">{getEmpTotalAllocated(emp.email)}D</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Used</p>
+                                                    <p className="font-black text-xs text-rose-500">{getEmpTotalTaken(emp.email)}D</p>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <IconButton
+                                                        icon={<Plus className="w-3 h-3" />}
+                                                        onClick={() => setAllocateModalEmpEmail(emp.email)}
+                                                        className="h-7 w-7 bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white"
+                                                    />
+                                                    <IconButton
+                                                        icon={<CalendarDays className="w-3 h-3" />}
+                                                        onClick={() => { setCalendarUserEmail(emp.email); setIsCalendarOpen(true); }}
+                                                        className="h-7 w-7"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Allocated</p>
-                                            <p className="font-black text-base text-slate-900">{getEmpTotalAllocated(emp.email)}<span className="text-[10px] text-slate-400 ml-1">Days</span></p>
-                                        </div>
-                                        <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Used</p>
-                                            <p className="font-black text-base text-slate-900">{getEmpTotalTaken(emp.email)}<span className="text-[10px] text-slate-400 ml-1">Days</span></p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <PrimaryButton className="flex-1 h-9 rounded-xl text-[10px] font-black uppercase shadow-none" onClick={() => setAllocateModalEmpEmail(emp.email)}>Allocate</PrimaryButton>
-                                        <IconButton icon={<CalendarDays className="w-4 h-4" />} onClick={() => { setCalendarUserEmail(emp.email); setIsCalendarOpen(true); }} className="h-9 w-9 rounded-xl border-slate-100 text-emerald-600 bg-emerald-50 hover:bg-emerald-100" />
-                                        <IconButton icon={<User className="w-4 h-4" />} onClick={() => { setManagingUserEmail(emp.email); setIsManagingBalances(true); }} className="h-9 w-9 rounded-xl border-slate-100 text-slate-400 bg-slate-50" />
-                                    </div>
-                                </div>
-                            </CardContainer>
-                        ))}
-                </div>
+                                ))}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="table"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            className="px-2"
+                        >
+                            <DataTable
+                                columns={[
+                                    {
+                                        header: "Team Member", key: "name", render: (emp) => (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-black text-xs">
+                                                    {emp.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{emp.name}</p>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{emp.role}</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    },
+                                    { header: "Department", key: "department", render: (emp) => <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{emp.department}</span> },
+                                    { header: "Allocated", key: "alloc", render: (emp) => <span className="text-xs font-black text-slate-900">{getEmpTotalAllocated(emp.email)} Days</span> },
+                                    { header: "Utilized", key: "used", render: (emp) => <span className="text-xs font-black text-rose-500">{getEmpTotalTaken(emp.email)} Days</span> },
+                                    {
+                                        header: "Quick Actions", key: "actions", render: (emp) => (
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button onClick={() => setAllocateModalEmpEmail(emp.email)} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase hover:bg-indigo-600 transition-colors">Allocate</button>
+                                                <IconButton icon={<CalendarDays className="w-3.5 h-3.5" />} onClick={() => { setCalendarUserEmail(emp.email); setIsCalendarOpen(true); }} className="h-8 w-8 rounded-lg" />
+                                                <IconButton icon={<User className="w-3.5 h-3.5" />} onClick={() => { setManagingUserEmail(emp.email); setIsManagingBalances(true); }} className="h-8 w-8 rounded-lg" />
+                                            </div>
+                                        )
+                                    }
+                                ]}
+                                data={employees
+                                    .filter(e => e.status === "Active")
+                                    .filter(e =>
+                                        (e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
+                                            e.role.toLowerCase().includes(empSearch.toLowerCase())) &&
+                                        (filterRole === "All Roles" || e.role === filterRole) &&
+                                        (filterDept === "All Depts" || e.department === filterDept)
+                                    )}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Show More Pagination */}
+                {employees.filter(e => e.status === "Active").length > visibleCount && (
+                    <div className="flex justify-center pt-8">
+                        <button
+                            onClick={() => setVisibleCount(prev => prev + 12)}
+                            className="group flex flex-col items-center gap-3 transition-all"
+                        >
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] group-hover:text-indigo-600 transition-colors">Show More Members</span>
+                            <div className="w-px h-12 bg-slate-200 group-hover:bg-indigo-500 transition-all group-hover:h-16" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-6 pt-10">

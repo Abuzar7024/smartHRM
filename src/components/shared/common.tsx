@@ -34,11 +34,12 @@ interface SectionHeaderProps {
     subtitle?: string;
     icon?: LucideIcon;
     badge?: React.ReactNode;
+    className?: string;
 }
 
-export function SectionHeader({ title, subtitle, icon: Icon, badge }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, icon: Icon, badge, className }: SectionHeaderProps) {
     return (
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2 mb-8">
+        <div className={cn("flex flex-col md:flex-row md:items-end justify-between gap-6 px-2 mb-8", className)}>
             <div className="space-y-1">
                 <div className="flex items-center gap-3">
                     {Icon && <Icon className="w-8 h-8 text-slate-900" />}
