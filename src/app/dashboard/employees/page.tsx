@@ -464,8 +464,8 @@ export default function EmployeesPage() {
                         />
                     </div>
                 </CardHeader>
-                <div className="overflow-x-auto">
-                    <Table>
+                <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                    <Table className="min-w-[800px]">
                         <TableHeader>
                             <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
                                 <TableHead className="h-10">Name & Contact</TableHead>
@@ -484,8 +484,8 @@ export default function EmployeesPage() {
                                                 {((emp.name || emp.email || "U")?.[0] || "U").toUpperCase()}
                                             </div>
                                             <div>
-                                                <div className="font-semibold text-slate-900">{emp.name || "Unnamed"}</div>
-                                                <div className="text-xs text-slate-500 flex items-center gap-1">
+                                                <div className="font-semibold text-slate-900 truncate max-w-[150px]">{emp.name || "Unnamed"}</div>
+                                                <div className="text-xs text-slate-500 flex items-center gap-1 truncate max-w-[150px]">
                                                     <Mail className="w-3 h-3" /> {emp.email}
                                                 </div>
                                             </div>

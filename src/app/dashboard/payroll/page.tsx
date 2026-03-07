@@ -130,8 +130,8 @@ export default function PayrollPage() {
                         <CardTitle className="text-base font-bold">Transaction Registry</CardTitle>
                         <CardDescription className="text-xs">Verification logs for all processed salary events.</CardDescription>
                     </CardHeader>
-                    <div className="overflow-x-auto">
-                        <Table>
+                    <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+                        <Table className="min-w-[600px] w-full">
                             <TableHeader>
                                 <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
                                     <TableHead className="h-10">TID</TableHead>

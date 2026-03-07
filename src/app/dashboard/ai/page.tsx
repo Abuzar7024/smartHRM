@@ -56,14 +56,17 @@ export default function AIInsightsPage() {
     }, [employees, tasks]);
 
     // ── CORPORATE DATA PROCESSING: Quarterly Forecast / Trend (Simulated) ──
-    const performanceTrend = useMemo(() => {
+    const [performanceTrend, setPerformanceTrend] = React.useState<{ month: string, revenue: number, efficiency: number, utilization: number }[]>([]);
+
+    React.useEffect(() => {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-        return months.map((month, i) => ({
+        const trend = months.map((month, i) => ({
             month,
             revenue: 2000 + (i * 400) + Math.floor(Math.random() * 500),
             efficiency: 60 + (i * 4) + Math.floor(Math.random() * 10),
             utilization: 70 + Math.floor(Math.random() * 15)
         }));
+        setPerformanceTrend(trend);
     }, []);
 
     const CORPORATE_PALETTE = ['#0f172a', '#334155', '#64748b', '#94a3b8'];
@@ -306,8 +309,8 @@ export default function AIInsightsPage() {
                         <CardDescription className="text-xs font-medium text-slate-500 mt-0.5">High-fidelity efficiency assessment by operational team</CardDescription>
                     </div>
                 </CardHeader>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+                    <table className="w-full text-left min-w-[700px]">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Operational Unit</th>

@@ -28,11 +28,16 @@ import {
     Wallet,
     FileCog,
     Megaphone,
-    Brain
+    Brain,
+    X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 
-export function Sidebar() {
+interface SidebarProps {
+    onClose?: () => void;
+}
+
+function SidebarComponent({ onClose }: SidebarProps) {
     const pathname = usePathname();
     const { role, logout, user } = useAuth();
     const { teams, chatMessages, chatReadTimestamps, profileUpdates, employees, payslipRequests } = useApp();
@@ -89,14 +94,22 @@ export function Sidebar() {
             initial={{ width: 256 }}
             animate={{ width: collapsed ? 72 : 256 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="h-screen flex flex-col justify-between sticky top-0 bg-[#0f172a] border-r border-white/5 shadow-xl overflow-hidden"
+            className="h-screen flex flex-col justify-between sticky top-0 bg-[#0f172a] border-r border-white/5 shadow-xl overflow-y-auto custom-scrollbar overflow-x-hidden"
         >
             {/* ── Header / Logo ── */}
             <div>
                 <div className={cn(
-                    "flex items-center border-b border-white/8 h-16",
+                    "flex items-center border-b border-white/8 h-16 relative",
                     collapsed ? "justify-center px-4" : "justify-between px-5"
                 )}>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="lg:hidden absolute -right-2 top-1/2 -translate-y-1/2 p-4 text-slate-400 hover:text-white"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    )}
                     {!collapsed && (
                         <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
@@ -226,3 +239,5 @@ export function Sidebar() {
         </motion.aside>
     );
 }
+
+export const Sidebar = memo(SidebarComponent);

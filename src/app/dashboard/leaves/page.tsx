@@ -225,7 +225,7 @@ export default function LeavesPage() {
                         columns={[
                             {
                                 header: "ID / Applied", key: "id", render: (leave) => (
-                                    <div>
+                                    <div className="hidden sm:block">
                                         <p className="text-xs font-black text-slate-900 uppercase">#{leave.id?.slice(-6) || 'N/A'}</p>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                             {leave.appliedAt ? new Date(leave.appliedAt).toLocaleDateString() : 'Historical Entry'}
@@ -249,7 +249,7 @@ export default function LeavesPage() {
                                 )
                             },
                             {
-                                header: "Impact", key: "days", render: (leave) => (
+                                header: "Impact", key: "days", className: "hidden md:table-cell", render: (leave) => (
                                     <p className="text-sm font-black text-slate-900">{leave.days} <span className="text-[10px] text-slate-400 font-medium">Days</span></p>
                                 )
                             },
@@ -530,9 +530,9 @@ export default function LeavesPage() {
                                             </div>
                                         )
                                     },
-                                    { header: "Department", key: "department", render: (emp) => <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{emp.department}</span> },
-                                    { header: "Allocated", key: "alloc", render: (emp) => <span className="text-xs font-black text-slate-900">{getEmpTotalAllocated(emp.email)} Days</span> },
-                                    { header: "Utilized", key: "used", render: (emp) => <span className="text-xs font-black text-rose-500">{getEmpTotalTaken(emp.email)} Days</span> },
+                                    { header: "Department", key: "department", className: "hidden lg:table-cell", render: (emp) => <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{emp.department}</span> },
+                                    { header: "Allocated", key: "alloc", className: "hidden sm:table-cell", render: (emp) => <span className="text-xs font-black text-slate-900">{getEmpTotalAllocated(emp.email)} Days</span> },
+                                    { header: "Utilized", key: "used", className: "hidden sm:table-cell", render: (emp) => <span className="text-xs font-black text-rose-500">{getEmpTotalTaken(emp.email)} Days</span> },
                                     {
                                         header: "Quick Actions", key: "actions", render: (emp) => (
                                             <div className="flex items-center justify-end gap-2">
@@ -592,12 +592,15 @@ export default function LeavesPage() {
                             header: "Category / Reason", key: "type", render: (leave) => (
                                 <div className="max-w-xs">
                                     <p className="text-xs font-black text-slate-900 uppercase">{leave.type}</p>
+                                    <p className="text-[10px] text-slate-500 font-bold sm:hidden mt-0.5">
+                                        {new Date(leave.from).toLocaleDateString()} - {new Date(leave.to).toLocaleDateString()}
+                                    </p>
                                     <p className="text-[10px] text-slate-400 font-medium italic mt-1 truncate">{leave.description}</p>
                                 </div>
                             )
                         },
                         {
-                            header: "Duration", key: "from", render: (leave) => (
+                            header: "Duration", key: "from", className: "hidden sm:table-cell", render: (leave) => (
                                 <p className="text-[10px] font-black text-slate-500 uppercase">
                                     {new Date(leave.from).toLocaleDateString()} - {new Date(leave.to).toLocaleDateString()}
                                 </p>

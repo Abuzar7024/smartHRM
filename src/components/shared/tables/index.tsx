@@ -48,6 +48,7 @@ export function StatusBadge({ status, variant = "outline", className }: StatusBa
 interface DataTableColumn<T> {
     header: string;
     key: string;
+    className?: string;
     render?: (item: T) => React.ReactNode;
 }
 
@@ -60,16 +61,17 @@ interface DataTableProps<T> {
 export function DataTable<T>({ columns, data, emptyMessage = "No records found" }: DataTableProps<T>) {
     return (
         <div className="overflow-hidden rounded-[2.5rem] border border-slate-100 shadow-xl bg-white">
-            <div className="overflow-x-auto">
-                <Table>
+            <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+                <Table className="min-w-[700px] w-full">
                     <TableHeader className="bg-slate-50/50">
                         <TableRow className="border-none">
                             {columns.map((col, i) => (
                                 <TableHead
                                     key={i}
                                     className={cn(
-                                        "font-black text-slate-400 uppercase text-[10px] tracking-widest px-8 h-16",
-                                        i === columns.length - 1 && "text-right"
+                                        "font-black text-slate-400 uppercase text-[10px] tracking-widest px-4 md:px-8 h-16",
+                                        i === columns.length - 1 && "text-right",
+                                        col.className
                                     )}
                                 >
                                     {col.header}
@@ -85,8 +87,9 @@ export function DataTable<T>({ columns, data, emptyMessage = "No records found" 
                                         <TableCell
                                             key={i}
                                             className={cn(
-                                                "px-8 py-5 text-sm font-medium text-slate-600",
-                                                i === columns.length - 1 && "text-right"
+                                                "px-4 md:px-8 py-5 text-sm font-medium text-slate-600",
+                                                i === columns.length - 1 && "text-right",
+                                                col.className
                                             )}
                                         >
                                             {col.render ? col.render(item) : (item as any)[col.key]}

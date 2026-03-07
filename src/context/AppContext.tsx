@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch, Timestamp, setDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, orderBy, where, getDocs, writeBatch, Timestamp, setDoc, limit } from "firebase/firestore";
 import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
 import type { AppPermission } from "@/lib/permissions";
@@ -253,7 +253,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 }, (error) => console.log("Firebase Payroll Error Setup:", error.message)
             );
 
-            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName)), (snapshot) => {
+            const unsubAttendance = onSnapshot(query(collection(db, "attendance"), where("companyName", "==", companyName), limit(200)), (snapshot) => {
                 const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
                 setAttendance(attData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Attendance Error Setup:", error.message));
@@ -271,7 +271,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                     setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument)));
                 }, (error) => console.log("Firebase Docs Error Setup:", error.message));
 
-            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), where("companyName", "==", companyName)), (snapshot) => {
+            const unsubNotifications = onSnapshot(query(collection(db, "notifications"), where("companyName", "==", companyName), limit(100)), (snapshot) => {
                 const nData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificationItem));
                 setNotifications(nData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Notifications Error Setup:", error.message));
@@ -295,7 +295,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 setTeams(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             }, (error) => console.log("Firebase Teams Error Setup:", error.message));
 
-            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), where("companyName", "==", companyName)), (snapshot) => {
+            const unsubChat = onSnapshot(query(collection(db, "chat_messages"), where("companyName", "==", companyName), limit(500)), (snapshot) => {
                 const cData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
                 setChatMessages(cData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
             }, (error) => console.log("Firebase Chat Error Setup:", error.message));
@@ -1468,26 +1468,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const contextValue = React.useMemo(() => ({
+        employees, addEmployee, removeEmployee, deleteEmployeeCascade, updateEmployeePermissions, updateEmployee,
+        approveRegistration, rejectRegistration, pendingRegistrations,
+        profileUpdates, requestProfileUpdate, approveProfileUpdate, rejectProfileUpdate,
+        leaves, requestLeave, updateLeaveStatus, approveLeaveRequest, rejectLeaveRequest,
+        leaveBalances, addLeaveBalance, bulkAddLeaveBalances, bulkDeleteLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
+        payroll, processPayroll, processSinglePayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
+        announcements, addAnnouncement, deleteAnnouncement,
+        attendance, clockIn, clockOut, takeBreak, endBreak,
+        tasks, addTask, updateTaskStatus, manageTaskTeam, deleteTask, updateTask, addTaskComment, addTaskAttachment,
+        documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus,
+        docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
+        notifications, createNotification, markNotificationRead, clearNotification, clearAllNotifications,
+        jobs, addJob, updateJobStatus,
+        teams, createTeam, updateTeam, deleteTeam,
+        chatMessages, sendMessage, deleteMessage, clearChat, reactToMessage, markChatRead, chatReadTimestamps,
+        uploadProfileImage, deleteCompanyCascade,
+        hasPermission
+    }), [
+        employees, pendingRegistrations, profileUpdates, leaves, leaveBalances, payroll, payslipRequests,
+        announcements, attendance, tasks, documents, docTemplates, notifications, jobs, teams,
+        chatMessages, chatReadTimestamps
+    ]);
+
     return (
-        <AppContext.Provider value={{
-            employees, addEmployee, removeEmployee, deleteEmployeeCascade, updateEmployeePermissions, updateEmployee,
-            approveRegistration, rejectRegistration, pendingRegistrations,
-            profileUpdates, requestProfileUpdate, approveProfileUpdate, rejectProfileUpdate,
-            leaves, requestLeave, updateLeaveStatus, approveLeaveRequest, rejectLeaveRequest,
-            leaveBalances, addLeaveBalance, bulkAddLeaveBalances, bulkDeleteLeaveBalances, updateLeaveBalance, deleteLeaveBalance,
-            payroll, processPayroll, processSinglePayroll, requestPayslip, payslipRequests, fulfillPayslipRequest,
-            announcements, addAnnouncement, deleteAnnouncement,
-            attendance, clockIn, clockOut, takeBreak, endBreak,
-            tasks, addTask, updateTaskStatus, manageTaskTeam, deleteTask, updateTask, addTaskComment, addTaskAttachment,
-            documents, requestDocument, requestMultipleDocuments, sendDocumentReminder, uploadDocument, updateDocumentStatus,
-            docTemplates, addDocTemplate, updateDocTemplate, deleteDocTemplate,
-            notifications, createNotification, markNotificationRead, clearNotification, clearAllNotifications,
-            jobs, addJob, updateJobStatus,
-            teams, createTeam, updateTeam, deleteTeam,
-            chatMessages, sendMessage, deleteMessage, clearChat, reactToMessage, markChatRead, chatReadTimestamps,
-            uploadProfileImage, deleteCompanyCascade,
-            hasPermission
-        }}>
+        <AppContext.Provider value={contextValue}>
             {children}
         </AppContext.Provider>
     );

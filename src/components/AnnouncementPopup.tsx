@@ -72,7 +72,7 @@ export function AnnouncementPopup() {
                 initial={{ opacity: 0, y: 50, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                className="fixed bottom-6 right-6 z-[100] max-w-sm w-full"
+                className="fixed bottom-4 left-4 right-4 md:bottom-6 md:right-6 md:left-auto z-[100] max-w-sm w-auto"
             >
                 <div className="bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden">
                     <div className={cn("p-4 flex items-center justify-between", styles.bg)}>

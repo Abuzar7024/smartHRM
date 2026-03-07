@@ -63,6 +63,13 @@ export default function DashboardLayout({
         setLoading(false); // Set loading to false once client is mounted
     }, []);
 
+    // Close mobile menu on route change
+    useEffect(() => {
+        if (mobileMenuOpen) {
+            setMobileMenuOpen(false);
+        }
+    }, [pathname]);
+
     // Check billing status for employee lock
     useEffect(() => {
         if (!user || !isClient) return;
@@ -327,22 +334,22 @@ export default function DashboardLayout({
             </AnimatePresence>
             {/* Sidebar with mobile state */}
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 flex-shrink-0 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0",
+                "fixed inset-y-0 left-0 z-50 w-auto transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0",
                 mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             )}>
-                <Sidebar />
+                <Sidebar onClose={() => setMobileMenuOpen(false)} />
             </div>
 
             {/* Mobile Overlay */}
             {mobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-40 lg:hidden cursor-pointer active:bg-slate-900/40"
                     onClick={() => setMobileMenuOpen(false)}
                 />
             )}
 
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
-                <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 sm:px-10 shadow-sm">
+                <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-10 shadow-sm">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -507,7 +514,7 @@ export default function DashboardLayout({
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10">
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
                     <div className="mx-auto w-full max-w-7xl">{children}</div>
                 </main>
                 <AnnouncementPopup />

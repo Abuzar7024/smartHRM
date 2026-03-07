@@ -27,7 +27,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative z-50 w-full max-w-lg overflow-hidden border bg-background p-6 shadow-lg sm:rounded-lg glassmorphism"
+                        className="relative z-50 w-full max-w-lg overflow-hidden border bg-background p-4 sm:p-6 shadow-lg rounded-3xl glassmorphism"
                     >
                         {children}
                         <button

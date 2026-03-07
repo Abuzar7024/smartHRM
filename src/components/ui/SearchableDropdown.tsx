@@ -46,7 +46,10 @@ export function SearchableDropdown({ value, onChange, options, placeholder, onAd
                     disabled={disabled}
                 />
                 {!isOpen && value && (
-                    <span className="absolute left-3 sm:left-[44px] -ml-2 right-8 truncate pointer-events-none text-slate-900 top-1/2 -translate-y-1/2 lg:ml-0 lg:left-3">
+                    <span className={cn(
+                        "absolute right-8 truncate pointer-events-none text-slate-900 top-1/2 -translate-y-1/2",
+                        Icon ? "left-10" : "left-3"
+                    )}>
                         {value}
                     </span>
                 )}

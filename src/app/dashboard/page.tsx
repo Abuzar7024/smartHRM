@@ -414,8 +414,8 @@ export default function DashboardOverview() {
                             <CardTitle className="text-base font-semibold">Recent Attendance Logs</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm whitespace-nowrap">
+                            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[500px]">
                                     <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                                         <tr>
                                             <th className="px-5 py-3 font-medium">Employee</th>
