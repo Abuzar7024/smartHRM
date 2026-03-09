@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User, Settings, FileText, Plus, Trash2, XCircle, AlertTriangle, Megaphone } from "lucide-react";
+import { Users, CalendarDays, CheckCircle, Clock, CheckSquare, User as UserIcon, Settings, FileText, Plus, Trash2, XCircle, AlertTriangle, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
@@ -199,18 +199,35 @@ export default function DashboardOverview() {
     return (
         <div className="space-y-6">
             {/* ── Greeting ── */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center text-slate-500">
-                        <User className="w-6 h-6" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 shadow-sm shrink-0">
+                        <UserIcon className="w-5 h-5" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">
-                            Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {user?.email?.split("@")[0] || "User"}
+                        <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-0.5">
+                            Welcome, {user?.email?.split("@")[0] || "User"}
                         </h1>
-                        <p className="text-sm text-slate-500">{"Here's what's happening today."}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Status: Operational • {new Date().toLocaleDateString()}</p>
                     </div>
                 </div>
+            </div>
+
+            {/* ── Stats grid ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {stats.map((stat, i) => (
+                    <Card key={i} className="shadow-sm border-slate-100 overflow-hidden group hover:border-slate-300 transition-colors">
+                        <CardContent className="p-3 flex items-center gap-3">
+                            <div className={cn("p-2 rounded-lg shrink-0", stat.bg)}>
+                                <stat.icon className={cn("w-4 h-4", stat.color)} />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate leading-none mb-1">{stat.title}</p>
+                                <h3 className="text-lg font-black text-slate-900 leading-none">{stat.value}</h3>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
             {/* ── Pending Documents Warning Banner (Employee only) ── */}
@@ -222,125 +239,16 @@ export default function DashboardOverview() {
                         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
                             <p className="text-sm font-bold text-amber-800">Action Required — Pending Document{myPendingDocs.length > 1 ? "s" : ""}</p>
-                            <p className="text-xs text-amber-700 mt-0.5">
-                                Your employer has requested {myPendingDocs.length} document{myPendingDocs.length > 1 ? "s" : ""} that require{myPendingDocs.length === 1 ? "s" : ""} your attention:
+                            <p className="text-xs text-amber-700 mt-0.5 leading-tight">
+                                Your employer has requested {myPendingDocs.length} document{myPendingDocs.length > 1 ? "s" : ""} that require{myPendingDocs.length === 1 ? "s" : ""} your attention.
                             </p>
-                            <ul className="mt-1.5 space-y-1">
-                                {myPendingDocs.map(d => (
-                                    <li key={d.id} className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                                        {d.title}
-                                    </li>
-                                ))}
-                            </ul>
                         </div>
-                        <a href="#onboarding-docs" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">
+                        <a href="/dashboard/profile#documents" className="text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-900 whitespace-nowrap">
                             Upload Now →
                         </a>
                     </div>
                 );
-            })()
-            }
-
-            {/* ── Stats + Timeclock grid ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat, i) => (
-                    <Card key={i} className="shadow-sm border-slate-200">
-                        <CardContent className="p-4 flex items-center gap-4">
-                            <div className={cn("p-3 rounded-md", stat.bg)}>
-                                <stat.icon className={cn("w-6 h-6", stat.color)} />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-bold text-slate-900 leading-none mb-1">{stat.value}</h3>
-                                <p className="text-xs font-medium text-slate-500">{stat.title}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-
-                {/* ── Timeclock Widget ── */}
-                {role === "employee" && (
-                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl p-5 flex flex-col justify-between gap-3 text-white shadow-md md:col-span-2 lg:col-span-1">
-                        <div className="flex flex-col w-full gap-2">
-                            {/* Header */}
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-[11px] font-bold text-indigo-100 tracking-widest uppercase">Work Timeclock</h3>
-                                {clockInTimeStr && (
-                                    <span className="text-[10px] bg-white/10 border border-white/20 rounded-full px-2 py-0.5 font-semibold">
-                                        In: {clockInTimeStr}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Main timer */}
-                            <div className="bg-white/10 border border-white/20 rounded-xl p-3 flex items-center justify-center gap-3">
-                                <Clock className="w-5 h-5 text-emerald-300 flex-shrink-0" />
-                                <span className="font-mono text-2xl font-bold tracking-widest text-white">{formattedWorkingTime}</span>
-                            </div>
-
-                            {/* Break time bar */}
-                            {(totalBreakMs > 0 || isOnBreak) && (
-                                <div className="flex items-center justify-between bg-amber-400/20 border border-amber-300/30 rounded-lg px-3 py-2">
-                                    <span className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">☕ Break</span>
-                                    <span className="font-mono text-sm font-bold text-amber-200">{formattedBreakTime}</span>
-                                </div>
-                            )}
-
-                            {/* Status dot */}
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className={cn(
-                                    "w-2 h-2 rounded-full flex-shrink-0",
-                                    isClockedIn ? "bg-emerald-400 animate-pulse" :
-                                        isOnBreak ? "bg-amber-400 animate-pulse" :
-                                            isClockedOut ? "bg-slate-400" : "bg-slate-500"
-                                )} />
-                                <p className="text-[11px] font-semibold uppercase tracking-widest">{getStatus()}</p>
-                            </div>
-                        </div>
-
-                        {/* ── Buttons ── */}
-                        <div className="flex gap-2 w-full">
-                            {!hasAnyRecord && (
-                                <button
-                                    onClick={() => clockIn(user!.email!)}
-                                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-bold uppercase text-xs transition-colors"
-                                >
-                                    ⏵ Clock In
-                                </button>
-                            )}
-                            {isClockedIn && (
-                                <>
-                                    <button
-                                        onClick={() => takeBreak(user!.email!)}
-                                        className="flex-1 py-2.5 bg-amber-400 hover:bg-amber-300 text-amber-900 rounded-lg font-bold uppercase text-xs transition-colors"
-                                    >
-                                        ☕ Break
-                                    </button>
-                                    <button
-                                        onClick={() => clockOut(user!.email!)}
-                                        className="flex-1 py-2.5 bg-indigo-900 border border-indigo-400/30 hover:bg-indigo-800 text-white rounded-lg font-bold uppercase text-xs transition-colors"
-                                    >
-                                        ⏹ Clock Out
-                                    </button>
-                                </>
-                            )}
-                            {isOnBreak && (
-                                <button
-                                    onClick={() => endBreak(user!.email!)}
-                                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-bold uppercase text-xs transition-colors"
-                                >
-                                    ▶ Resume Work
-                                </button>
-                            )}
-                            {isClockedOut && (
-                                <div className="w-full text-center text-xs font-semibold text-indigo-200 py-2.5">
-                                    ✓ Shift completed for today
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
+            })()}
 
             {/* ── Pending Submissions Panel (Employer only) ── */}
             {

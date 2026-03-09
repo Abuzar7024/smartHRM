@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle, Lock, Settings, CreditCard } from "lucide-react";
+import { Search, Plus, UserPlus, Mail, ShieldCheck, AlertTriangle, Users, Calendar, Trash2, CheckCircle, XCircle, Lock, Settings, CreditCard, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/Dialog";
 import { cn } from "@/lib/utils";
@@ -18,21 +18,19 @@ import { useRouter } from "next/navigation";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { AddEmployeeForm } from "@/components/employees/AddEmployeeForm";
+import { EmployeeTable } from "@/components/employees/EmployeeTable";
 
 export default function EmployeesPage() {
-    const { role, companyName } = useAuth();
+    const { role, companyName, user } = useAuth();
     const router = useRouter();
     const { employees, documents, docTemplates, requestMultipleDocuments, addDocTemplate, deleteDocTemplate, attendance, payroll, leaves, updateEmployeePermissions, createNotification, deleteEmployeeCascade, approveRegistration, rejectRegistration, pendingRegistrations } = useApp();
     const [searchTerm, setSearchTerm] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [deletingEmp, setDeletingEmp] = useState<{ id: string; name: string; email: string } | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
-    const [selectedDocsToReq, setSelectedDocsToReq] = useState<string[]>([]);
-
-    // Document Template Modal State
-    const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
-    const [docTitle, setDocTitle] = useState("");
-    const [docRequired, setDocRequired] = useState(false);
+    const [employeeLimit, setEmployeeLimit] = useState(5);
+    const [fetchingLimit, setFetchingLimit] = useState(true);
 
     // Dynamic Departments & Roles (SaaS requirement)
     const [companyConfig, setCompanyConfig] = useState<{ departments: { name: string; roles: string[] }[] }>({
@@ -64,25 +62,6 @@ export default function EmployeesPage() {
             await setDoc(doc(db, "companySettings", companyName), newConfig, { merge: true });
         }
     };
-
-    // Form State
-    const [empName, setEmpName] = useState("");
-    const [empEmail, setEmpEmail] = useState("");
-    const [empRole, setEmpRole] = useState("");
-    const [empPosition, setEmpPosition] = useState("");
-    const [empDept, setEmpDept] = useState("");
-    const [empPassword, setEmpPassword] = useState("");
-    const [ctc, setCtc] = useState("");
-    const [pf, setPf] = useState("");
-    const [tds, setTds] = useState("");
-    const [insuranceOpted, setInsuranceOpted] = useState(false);
-    const [insuranceAmount, setInsuranceAmount] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    // Limits & Razorpay Upgrade State
-    const [employeeLimit, setEmployeeLimit] = useState(5);
-    const [fetchingLimit, setFetchingLimit] = useState(true);
 
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
@@ -162,103 +141,28 @@ export default function EmployeesPage() {
         (emp.email?.toLowerCase() || "").includes((searchTerm || "").toLowerCase())
     );
 
-    const availableDepartments = useMemo(() => companyConfig.departments.map(d => d.name), [companyConfig]);
+    const availableDepartments = useMemo(() => companyConfig.departments.map((d: any) => d.name), [companyConfig]);
     const availableRoles = useMemo(() => {
-        const deptObj = companyConfig.departments.find(d => d.name === empDept);
+        const deptObj = companyConfig.departments.find((d: any) => d.name === "Engineering"); // Standard placeholder
         return deptObj ? deptObj.roles : [];
-    }, [empDept, companyConfig]);
+    }, [companyConfig]);
 
     const handleAddDepartment = (newDept: string) => {
-        if (companyConfig.departments.some(d => d.name.toLowerCase() === newDept.toLowerCase())) return;
+        if (companyConfig.departments.some((d: any) => d.name.toLowerCase() === newDept.toLowerCase())) return;
         saveCompanyConfig({ departments: [...companyConfig.departments, { name: newDept, roles: [] }] });
         toast.success(`Department "${newDept}" added!`);
     };
 
-    const handleAddRole = (newRole: string) => {
-        if (!empDept) return;
-        const mappedConfig = companyConfig.departments.map(d => {
-            if (d.name === empDept) {
+    const handleAddRole = (newRole: string, deptName: string) => {
+        if (!deptName) return;
+        const mappedConfig = companyConfig.departments.map((d: any) => {
+            if (d.name === deptName) {
                 if (!d.roles.includes(newRole)) return { ...d, roles: [...d.roles, newRole] };
             }
             return d;
         });
         saveCompanyConfig({ departments: mappedConfig });
-        toast.success(`Role "${newRole}" added to ${empDept}!`);
-    };
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!empName || !empEmail || !empPassword) return;
-
-        setLoading(true);
-        setError("");
-
-        try {
-            const response = await fetch('/api/employees/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: empName,
-                    email: empEmail,
-                    password: empPassword,
-                    role: empRole || "Staff",
-                    position: empPosition || "Staff",
-                    department: empDept || "General",
-                    ctc,
-                    pf,
-                    tds,
-                    insuranceOpted,
-                    insuranceAmount: insuranceOpted ? insuranceAmount : ""
-                }),
-            });
-
-            if (response.ok) {
-                toast.success("Employee Successfully Onboarded!", { description: `${empName} has been added to the Workforce Database.` });
-                createNotification({
-                    title: "System Onboarding Success",
-                    message: `Operative ${empName} (${empEmail}) was added to the ${empDept} unit as a ${empRole}.`,
-                    targetRole: "employer"
-                });
-
-                if (selectedDocsToReq.length > 0) {
-                    await requestMultipleDocuments(empEmail, selectedDocsToReq);
-                    toast.success("Documents Requested", { description: "Onboarding documents have been requested." });
-                }
-
-                setShowForm(false);
-                setEmpName("");
-                setEmpEmail("");
-                setEmpPassword("");
-                setEmpRole("");
-                setEmpPosition("");
-                setEmpDept("");
-                setSelectedDocsToReq([]);
-            } else {
-                const data = await response.json();
-                setError(data.error || "Failed to add employee");
-                if (data.error?.includes("Subscription limits exceeded")) {
-                    // Force the button logic to update immediately
-                    setEmployeeLimit(employees.length);
-                } else {
-                    toast.error("Process Failed", { description: data.error || "Could not complete onboarding. Check permissions or network." });
-                    createNotification({
-                        title: "Onboarding Terminated",
-                        message: `Internal System Error while trying to recruit ${empEmail}: ${data.error || "Network error"}`,
-                        targetRole: "employer"
-                    });
-                }
-            }
-        } catch (err) {
-            setError("A network error occurred.");
-            toast.error("Network Exception", { description: "Please ensure you have a stable connection and the server is running." });
-            createNotification({
-                title: "Network Exception Incident",
-                message: `Failed secure connection to recruitment servers involving ${empEmail}.`,
-                targetRole: "employer"
-            });
-        } finally {
-            setLoading(false);
-        }
-
+        toast.success(`Role "${newRole}" added to ${deptName}!`);
     };
 
     return (
@@ -288,7 +192,7 @@ export default function EmployeesPage() {
                 )}
             </div>
 
-            {/* ── Add Form ── */}
+            {/* ── Onboarding Form ── */}
             <AnimatePresence>
                 {showForm && !isLimitReached && (
                     <motion.div
@@ -297,155 +201,18 @@ export default function EmployeesPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden"
                     >
-                        <Card className="border-slate-200 shadow-md rounded-xl">
-                            <CardHeader className="bg-slate-50/50 border-b">
-                                <CardTitle className="text-lg font-bold">Onboard New Employee</CardTitle>
-                                <CardDescription>Register a new member to the organization. Limt: {employees.length}/{employeeLimit} used.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-6">
-                                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Full Name</Label>
-                                        <Input required value={empName} onChange={e => setEmpName(e.target.value)} placeholder="e.g. Jane Doe" className="rounded-lg" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Work Email</Label>
-                                        <Input required type="email" value={empEmail} onChange={e => setEmpEmail(e.target.value)} placeholder="e.g. jane.doe@acmecorp.com" className="rounded-lg" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Initial Password</Label>
-                                        <Input required type="password" value={empPassword} onChange={e => setEmpPassword(e.target.value)} placeholder="••••••••" className="rounded-lg" />
-                                    </div>
-                                    <div className="space-y-1.5 lg:col-span-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Department</Label>
-                                        <SearchableDropdown
-                                            value={empDept}
-                                            onChange={(val) => { setEmpDept(val); setEmpRole(""); }}
-                                            options={availableDepartments}
-                                            placeholder="Select department..."
-                                            onAddTarget={handleAddDepartment}
-                                            onAddActionLabel="+ Create Department"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Job Role</Label>
-                                        <SearchableDropdown
-                                            value={empRole}
-                                            onChange={setEmpRole}
-                                            options={availableRoles}
-                                            placeholder={empDept ? "Select a role..." : "Please choose department first"}
-                                            disabled={!empDept}
-                                            onAddTarget={handleAddRole}
-                                            onAddActionLabel="+ Add Role to Department"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">Position</Label>
-                                        <Input required value={empPosition} onChange={e => setEmpPosition(e.target.value)} placeholder="e.g. Senior Frontend Engineer" className="rounded-lg" />
-                                    </div>
-
-                                    <div className="md:col-span-2 lg:col-span-3 space-y-4 pt-6 border-t mt-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <Label className="text-sm font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                                <CreditCard className="w-4 h-4 text-indigo-600" /> Compensation Details
-                                            </Label>
-                                            <Badge variant="outline" className="text-[10px] font-bold bg-indigo-50 border-indigo-100 text-indigo-700">Financial Setup</Badge>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-bold text-slate-600">Annual CTC (₹) *</Label>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="e.g. 1200000"
-                                                    value={ctc}
-                                                    onChange={e => setCtc(e.target.value)}
-                                                    required
-                                                    className="rounded-lg h-10"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-bold text-slate-600">Monthly PF (₹)</Label>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="e.g. 1800"
-                                                    value={pf}
-                                                    onChange={e => setPf(e.target.value)}
-                                                    className="rounded-lg h-10"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-bold text-slate-600">Monthly TDS (₹) *</Label>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="e.g. 5000"
-                                                    value={tds}
-                                                    onChange={e => setTds(e.target.value)}
-                                                    required
-                                                    className="rounded-lg h-10"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs font-bold text-slate-600">Insurance</Label>
-                                                <div className="flex items-center gap-2 h-10">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="insOpt"
-                                                        checked={insuranceOpted}
-                                                        onChange={() => setInsuranceOpted(!insuranceOpted)}
-                                                        className="rounded border-slate-300 w-4 h-4 text-indigo-600"
-                                                    />
-                                                    <Label htmlFor="insOpt" className="text-xs cursor-pointer">Opted</Label>
-                                                    {insuranceOpted && (
-                                                        <Input
-                                                            type="number"
-                                                            placeholder="Premium"
-                                                            value={insuranceAmount}
-                                                            onChange={e => setInsuranceAmount(e.target.value)}
-                                                            className="rounded-lg h-8 text-xs flex-1"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
-                                            <div>
-                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Estimated Monthly In-Hand</p>
-                                                <p className="text-2xl font-black text-slate-900">
-                                                    ₹{Number(ctc ? (Number(ctc) / 12) - Number(pf || 0) - Number(tds || 0) - (insuranceOpted ? Number(insuranceAmount || 0) : 0) : 0).toLocaleString()}
-                                                </p>
-                                            </div>
-                                            <div className="text-right text-[10px] text-slate-500 font-medium">
-                                                <p>Calculation: (CTC/12) - PF - TDS {insuranceOpted ? "- Insurance" : ""}</p>
-                                                <p className="mt-0.5 italic">subject to professional taxes & other deductions</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {error && (
-                                        <div className="md:col-span-2 lg:col-span-3 bg-rose-50 border border-rose-200 p-3 rounded-lg flex flex-col gap-2 text-rose-600 text-xs font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                                                {error}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-2">
-                                        <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-                                        <Button type="submit" variant="corporate" disabled={loading} className="min-w-[140px]">
-                                            {loading ? "Registering..." : "Confirm & Onboard"}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
+                        <AddEmployeeForm
+                            onClose={() => setShowForm(false)}
+                            employeeLimit={employeeLimit}
+                            currentEmployeeCount={employees.length}
+                            companyConfig={companyConfig}
+                            onConfigUpdate={saveCompanyConfig}
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* ── Directory Table ── */}
+            {/* ── Workforce Database ── */}
             <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
                 <CardHeader className="p-4 md:p-6 bg-slate-50/50 border-b flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
@@ -464,88 +231,14 @@ export default function EmployeesPage() {
                         />
                     </div>
                 </CardHeader>
-                <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                    <Table className="min-w-[800px]">
-                        <TableHeader>
-                            <TableRow className="bg-white hover:bg-white text-xs text-slate-500 uppercase font-semibold">
-                                <TableHead className="h-10">Name & Contact</TableHead>
-                                <TableHead className="h-10">Role & Position</TableHead>
-                                <TableHead className="h-10">Department</TableHead>
-                                <TableHead className="h-10">DOJ / Status</TableHead>
-                                <TableHead className="h-10 text-right">Permissions & Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filtered.map((emp) => (
-                                <TableRow key={emp.id} className="group border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                                    <TableCell className="py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600">
-                                                {((emp.name || emp.email || "U")?.[0] || "U").toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <div className="font-semibold text-slate-900 truncate max-w-[150px]">{emp.name || "Unnamed"}</div>
-                                                <div className="text-xs text-slate-500 flex items-center gap-1 truncate max-w-[150px]">
-                                                    <Mail className="w-3 h-3" /> {emp.email}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="py-4 text-sm text-slate-700">
-                                        <div className="font-medium">{emp.role}</div>
-                                        {emp.position && <div className="text-xs text-slate-500 mt-0.5">{emp.position}</div>}
-                                    </TableCell>
-                                    <TableCell className="py-4 text-sm text-slate-500">{emp.department}</TableCell>
-                                    <TableCell className="py-4">
-                                        <div className="flex flex-col items-start gap-1">
-                                            <div className="text-[10px] text-slate-500 flex items-center gap-1 font-medium bg-slate-100 px-2 py-0.5 rounded">
-                                                <Calendar className="w-3 h-3" />
-                                                {emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : "Unknown"}
-                                            </div>
-                                            <Badge variant={
-                                                emp.status === "Active" ? "success" :
-                                                    emp.status === "On Leave" ? "warning" : "destructive"
-                                            } className="rounded-md font-bold text-[10px] h-5 px-2">
-                                                {emp.status}
-                                            </Badge>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="py-4 text-right">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-[10px] h-7 px-2 rounded-md mr-2"
-                                            onClick={() => {
-                                                setSelectedEmp(emp);
-                                                setPermissionsModalOpen(true);
-                                            }}
-                                        >
-                                            <ShieldCheck className="w-3 h-3 mr-1" /> Perms
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            className="text-slate-400 rounded-lg hover:text-rose-600 hover:bg-rose-50"
-                                            onClick={() => setDeletingEmp({ id: emp.id!, name: emp.name, email: emp.email })}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {filtered.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-24 text-slate-400">
-                                        <div className="flex flex-col items-center gap-2 opacity-30">
-                                            <Users className="w-8 h-8" />
-                                            <p className="text-sm font-medium">No matching records found</p>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                <EmployeeTable
+                    employees={filtered}
+                    onManagePermissions={(emp) => {
+                        setSelectedEmp(emp);
+                        setPermissionsModalOpen(true);
+                    }}
+                    onDelete={setDeletingEmp}
+                />
             </Card>
 
             {/* ── Pending Registrations ── */}

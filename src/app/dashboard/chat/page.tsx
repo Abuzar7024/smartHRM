@@ -6,7 +6,7 @@ import { useApp } from "@/context/AppContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { MessageSquare, Send, Search, Trash2, Reply, SmilePlus, X, CheckCircle2, ArrowLeft } from "lucide-react";
+import { MessageSquare, Send, Search, Trash2, Reply, SmilePlus, X, Check, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -15,14 +15,14 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // ── Local hook to get all registered users from /users collection ──
 function useAllUsers(companyName?: string) {
-    const [users, setUsers] = useState<{ uid: string; email: string; role: string; companyName?: string }[]>([]);
+    const [users, setUsers] = useState<{ uid: string; email: string; role: string; lastSeen?: number; companyName?: string }[]>([]);
     useEffect(() => {
         if (!companyName) {
             setUsers([]);
             return;
         }
         const unsub = onSnapshot(query(collection(db, "users"), where("companyName", "==", companyName)), snap => {
-            setUsers(snap.docs.map(d => ({ uid: d.id, ...(d.data() as { email: string; role: string; companyName?: string }) })));
+            setUsers(snap.docs.map(d => ({ uid: d.id, ...(d.data() as { email: string; role: string; lastSeen?: number; companyName?: string }) })));
         });
         return () => unsub();
     }, [companyName]);
@@ -229,8 +229,15 @@ export default function ChatPage() {
                                 <div className="flex-1">
                                     <h3 className="font-black text-lg text-slate-900 leading-tight">{selectedContact.name}</h3>
                                     <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedContact.role} • Online</p>
+                                        <span className={cn(
+                                            "w-2 h-2 rounded-full",
+                                            (allUsers.find(u => u.email === selectedUserEmail)?.lastSeen || 0) > (Date.now() - 300000)
+                                                ? "bg-emerald-500 animate-pulse"
+                                                : "bg-slate-300"
+                                        )} />
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                            {selectedContact.role} • {(allUsers.find(u => u.email === selectedUserEmail)?.lastSeen || 0) > (Date.now() - 300000) ? "Online" : "Offline"}
+                                        </p>
                                     </div>
                                 </div>
                                 <Button
@@ -308,7 +315,12 @@ export default function ChatPage() {
                                                             )}>
                                                                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </span>
-                                                            {isMe && <CheckCircle2 className="w-3 h-3 text-indigo-200" />}
+                                                            {isMe && (
+                                                                <span className="flex items-center ml-1">
+                                                                    <Check className={cn("w-3 h-3 transition-colors", msg.status === "read" ? "text-blue-400" : "text-slate-400")} />
+                                                                    {msg.status === "read" && <Check className="w-3 h-3 -ml-2 text-blue-400" />}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
 

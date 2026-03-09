@@ -82,7 +82,6 @@ function SidebarComponent({ onClose }: SidebarProps) {
         ...((isTeamLeader || isTeamMember) ? [{ name: "Teams", href: "/dashboard/teams", icon: UsersRound, badge: 0 }] : []),
         { name: "Assign Task", href: "/dashboard/tasks/assign", icon: UserPlus, hidden: !employees.find(e => e.email === user?.email)?.permissions?.includes("assign_tasks") },
         { name: "My Tasks", href: "/dashboard/tasks", icon: CheckSquare },
-        { name: "My Profile", href: "/dashboard/profile", icon: User },
         { name: "My Payslips", href: "/dashboard/payslips", icon: CreditCard },
         { name: "My Leaves", href: "/dashboard/leaves", icon: CalendarDays },
     ];

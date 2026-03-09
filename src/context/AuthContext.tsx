@@ -12,6 +12,7 @@ interface AuthContextType {
     role: Role;
     status: string | null;
     companyName: string | null;
+    lastSeen?: number;
     loading: boolean;
     logout: () => Promise<void>;
 }
@@ -66,6 +67,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         return () => unsubscribe();
     }, []);
+
+    // Presence system: update "lastSeen" every 2 minutes while active
+    useEffect(() => {
+        if (!user) return;
+
+        const updatePresence = async () => {
+            try {
+                const { setDoc, doc } = await import("firebase/firestore");
+                const { db } = await import("@/lib/firebase");
+                await setDoc(doc(db, "users", user.uid), { lastSeen: Date.now() }, { merge: true });
+            } catch (e) {
+                console.error("Presence update failed:", e);
+            }
+        };
+
+        updatePresence();
+        const interval = setInterval(updatePresence, 120000); // 2 minutes
+        return () => clearInterval(interval);
+    }, [user]);
 
     const logout = async () => {
         await fetch('/api/auth/session', { method: 'DELETE' });

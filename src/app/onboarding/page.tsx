@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
     ShieldCheck, ArrowRight, ArrowLeft, Building2, Users,
     CreditCard, CheckCircle2, Lock, Sparkles, Building,
-    Globe, Mail, BadgeIndianRupee, MapPin, Search, Plus
+    Globe, Mail, BadgeIndianRupee, MapPin, Search, Plus, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -16,25 +17,82 @@ import { cn } from "@/lib/utils";
 
 const STEPS = [
     { id: 0, title: 'Welcome' },
-    { id: 1, title: 'Company Setup', benefit: 'Proper setup allows us to automate compliance & tax settings for your region.' },
-    { id: 2, title: 'Add First Employee', benefit: 'Start managing your team instantly. We will send them a secure invite link.' },
-    { id: 3, title: 'Payroll Preferences', benefit: 'Automated payroll saves an average of 20 hours per month.' },
-    { id: 4, title: 'Billing Setup', benefit: 'First 5 employees are completely free. Secure and encrypted payments.' },
-    { id: 5, title: 'Completion' }
+    { id: 1, title: 'Basic Setup', benefit: 'Setting up your company name and region for localized compliance.' },
+    { id: 2, title: 'Verification', benefit: 'Legal credentials ensure workspace authenticity and fraud prevention.' },
+    { id: 3, title: 'Add First Employee', benefit: 'Start managing your team instantly. We will send them a secure invite link.' },
+    { id: 4, title: 'Payroll Setup', benefit: 'Automated payroll saves an average of 20 hours per month.' },
+    { id: 5, title: 'Billing Setup', benefit: 'First 5 employees are completely free. Secure and encrypted payments.' },
+    { id: 6, title: 'Completion' }
 ];
 
 export default function OnboardingFlow() {
     const router = useRouter();
+    const { user } = useAuth();
     const [step, setStep] = useState(0);
     const [direction, setDirection] = useState(1);
 
     // Context states
-    const [company, setCompany] = useState({ name: '', industry: 'Technology', size: '1-10', timezone: 'Asia/Kolkata' });
+    const [company, setCompany] = useState({
+        name: '',
+        industry: 'Technology',
+        size: '1-10',
+        timezone: 'Asia/Kolkata',
+        address: '',
+        regNo: '',
+        website: '',
+        phone: ''
+    });
     const [employee, setEmployee] = useState({ name: '', email: '', role: '', salary: '', invite: true });
     const [payroll, setPayroll] = useState({ cycle: 'Monthly', currency: 'INR', tax: true });
     const [billing, setBilling] = useState({ method: 'UPI' });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [suggestion, setSuggestion] = useState("");
+    const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
+    const [checkingCompany, setCheckingCompany] = useState(false);
+
+    const checkCompanyExists = async (name: string) => {
+        setCheckingCompany(true);
+        setErrors({});
+        try {
+            const { getDocs, query, collection, where } = await import("firebase/firestore");
+            const { db } = await import("@/lib/firebase");
+            const q = query(collection(db, "users"), where("companyName", "==", name));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                // Generate "AI" suggestions (smart variations)
+                const suffixes = ["Solutions", "Dynamics", "Systems", "Connect", "Pulse", "Forge"];
+                const suggestions = suffixes
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, 3)
+                    .map(s => `${name} ${s}`);
+
+                setCompanySuggestions(suggestions);
+                setErrors({ company: "This company name is already registered." });
+                return true;
+            }
+            setCompanySuggestions([]);
+            return false;
+        } catch (e) {
+            console.error(e);
+            return false;
+        } finally {
+            setCheckingCompany(false);
+        }
+    };
+
+    // Auto-suggest email based on name and company domain
+    useEffect(() => {
+        if (employee.name && user?.email) {
+            const domain = user.email.split('@')[1];
+            if (domain) {
+                const formattedName = employee.name.toLowerCase().trim().replace(/\s+/g, '.');
+                setSuggestion(`${formattedName}@${domain}`);
+            }
+        } else {
+            setSuggestion("");
+        }
+    }, [employee.name, user?.email]);
 
     const nextStep = () => {
         // Validation before proceeding
@@ -43,8 +101,27 @@ export default function OnboardingFlow() {
                 setErrors({ company: "Company name is required." });
                 return;
             }
+            checkCompanyExists(company.name).then(exists => {
+                if (!exists) {
+                    setErrors({});
+                    setDirection(1);
+                    setStep(p => Math.min(p + 1, 6));
+                }
+            });
+            return; // Wait for async check
         }
         if (step === 2) {
+            const stepErrors: Record<string, string> = {};
+            if (!company.regNo.trim()) stepErrors.regNo = "Registration Number is required for verification.";
+            if (!company.address.trim()) stepErrors.address = "Business address is required.";
+            if (!company.website.trim()) stepErrors.website = "Company website is required.";
+
+            if (Object.keys(stepErrors).length > 0) {
+                setErrors(stepErrors);
+                return;
+            }
+        }
+        if (step === 3) {
             if (!employee.name.trim() && employee.email.trim()) {
                 setErrors({ employee: "Name is required if email is provided." });
                 return;
@@ -53,7 +130,7 @@ export default function OnboardingFlow() {
 
         setErrors({});
         setDirection(1);
-        setStep(p => Math.min(p + 1, 5));
+        setStep(p => Math.min(p + 1, 6));
     };
 
     const prevStep = () => {
@@ -64,7 +141,7 @@ export default function OnboardingFlow() {
     const skipStep = () => {
         setErrors({});
         setDirection(1);
-        setStep(p => Math.min(p + 1, 5));
+        setStep(p => Math.min(p + 1, 6));
     };
 
     // Animation Config for smooth micro-interactions (150-250ms feel)
@@ -90,16 +167,16 @@ export default function OnboardingFlow() {
             <div className="flex-1 flex flex-col items-center justify-center p-4 py-12 md:p-8 relative">
 
                 {/* Progress Bar Display */}
-                {step > 0 && step < 5 && (
+                {step > 0 && step < 6 && (
                     <div className="w-full max-w-xl mb-8 flex flex-col gap-3">
                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest relative px-1">
-                            <span>Step {step} of 4</span>
+                            <span>Step {step} of 5</span>
                             <span className="text-indigo-600">{STEPS[step].title}</span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden relative">
                             <motion.div
                                 initial={{ width: 0 }}
-                                animate={{ width: `${(step / 4) * 100}%` }}
+                                animate={{ width: `${(step / 5) * 100}%` }}
                                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} // Springy ease
                                 className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full"
                             />
@@ -168,9 +245,40 @@ export default function OnboardingFlow() {
                                                     setCompany({ ...company, name: e.target.value });
                                                     setErrors({});
                                                 }}
-                                                className={cn("h-12 rounded-xl border-slate-200 focus:ring-2 focus:ring-indigo-500", errors.company && "border-rose-300 focus:ring-rose-500")}
+                                                className={cn("h-12 rounded-xl border-slate-200 focus:ring-2 focus:ring-indigo-500", (errors.company || companySuggestions.length > 0) && "border-rose-300 focus:ring-rose-500")}
                                             />
-                                            {errors.company && <p className="text-xs text-rose-500 font-bold mt-1">{errors.company}</p>}
+                                            <AnimatePresence>
+                                                {checkingCompany && (
+                                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                        <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                            {errors.company && <p className="text-xs text-rose-500 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> {errors.company}</p>}
+
+                                            {companySuggestions.length > 0 && (
+                                                <div className="mt-4 space-y-2">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                                                        <Sparkles className="w-3 h-3 text-indigo-500" /> AI Recommended Alternatives
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {companySuggestions.map((s) => (
+                                                            <button
+                                                                key={s}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setCompany({ ...company, name: s });
+                                                                    setCompanySuggestions([]);
+                                                                    setErrors({});
+                                                                }}
+                                                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100 transition-colors"
+                                                            >
+                                                                {s}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
@@ -231,8 +339,77 @@ export default function OnboardingFlow() {
                                 </div>
                             )}
 
-                            {/* Step 2: Add First Employee */}
+                            {/* Step 2: Legal Verification */}
                             {step === 2 && (
+                                <div className="p-8 md:p-10">
+                                    <div className="mb-8">
+                                        <h2 className="text-2xl font-black tracking-tight mb-2 flex items-center gap-2">
+                                            <ShieldCheck className="w-6 h-6 text-emerald-500" /> Identity & Verification
+                                        </h2>
+                                        <p className="text-slate-500 text-sm font-medium">{STEPS[2].benefit}</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-2 relative">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Registration No / Tax ID (GST/EIN)</Label>
+                                            <div className="relative">
+                                                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <Input
+                                                    autoFocus
+                                                    placeholder="VERIFY-1234-5678"
+                                                    value={company.regNo}
+                                                    onChange={e => setCompany({ ...company, regNo: e.target.value.toUpperCase() })}
+                                                    className={cn("h-11 rounded-xl border-slate-200 pl-10", errors.regNo && "border-rose-300 bg-rose-50")}
+                                                />
+                                            </div>
+                                            {errors.regNo && <p className="text-[10px] text-rose-500 font-bold mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errors.regNo}</p>}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Business Website</Label>
+                                            <div className="relative">
+                                                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <Input
+                                                    placeholder="https://acme.org"
+                                                    value={company.website}
+                                                    onChange={e => setCompany({ ...company, website: e.target.value })}
+                                                    className={cn("h-11 rounded-xl border-slate-200 pl-10", errors.website && "border-rose-300 bg-rose-50")}
+                                                />
+                                            </div>
+                                            {errors.website && <p className="text-[10px] text-rose-500 font-bold mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errors.website}</p>}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Registered Office Address</Label>
+                                            <div className="relative">
+                                                <MapPin className="absolute left-3 top-4 w-4 h-4 text-slate-400" />
+                                                <textarea
+                                                    placeholder="Unit 102, Silicon Tower, Business Bay..."
+                                                    value={company.address}
+                                                    onChange={e => setCompany({ ...company, address: e.target.value })}
+                                                    className={cn(
+                                                        "w-full h-24 rounded-xl border border-slate-200 bg-white px-10 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none",
+                                                        errors.address && "border-rose-300 bg-rose-50"
+                                                    )}
+                                                />
+                                            </div>
+                                            {errors.address && <p className="text-[10px] text-rose-500 font-bold mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errors.address}</p>}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 flex items-center justify-between pt-6 border-t border-slate-100">
+                                        <Button variant="ghost" onClick={prevStep} className="font-bold text-slate-500 hover:text-slate-900 rounded-lg h-11 px-6">
+                                            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                                        </Button>
+                                        <Button onClick={nextStep} className="font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/30 h-11 px-8 transition-transform active:scale-95">
+                                            Verify & Continue <ArrowRight className="w-4 h-4 ml-2" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3: Add First Employee */}
+                            {step === 3 && (
                                 <div className="p-8 md:p-10">
                                     <div className="mb-8 flex justify-between items-start gap-4">
                                         <div>
@@ -260,13 +437,29 @@ export default function OnboardingFlow() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Email Address</Label>
-                                                <Input
-                                                    type="email"
-                                                    placeholder="jane@acme.com"
-                                                    value={employee.email}
-                                                    onChange={e => setEmployee({ ...employee, email: e.target.value })}
-                                                    className="h-11 rounded-xl border-slate-200"
-                                                />
+                                                <div className="relative">
+                                                    <Input
+                                                        type="email"
+                                                        placeholder="jane@acme.com"
+                                                        value={employee.email}
+                                                        onChange={e => setEmployee({ ...employee, email: e.target.value })}
+                                                        className="h-11 rounded-xl border-slate-200"
+                                                    />
+                                                    <AnimatePresence>
+                                                        {suggestion && employee.email !== suggestion && !employee.email.includes('@') && (
+                                                            <motion.button
+                                                                initial={{ opacity: 0, y: -5 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                exit={{ opacity: 0, y: -5 }}
+                                                                type="button"
+                                                                onClick={() => setEmployee({ ...employee, email: suggestion })}
+                                                                className="absolute -bottom-6 left-0 text-[10px] text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 bg-indigo-50/50 px-2 py-0.5 rounded-md border border-indigo-100 transition-colors"
+                                                            >
+                                                                <Sparkles className="w-2.5 h-2.5" /> Use {suggestion}?
+                                                            </motion.button>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -504,14 +697,14 @@ export default function OnboardingFlow() {
                                             <ArrowLeft className="w-4 h-4 mr-2" /> Back
                                         </Button>
                                         <Button onClick={nextStep} className="w-full sm:w-auto font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-xl shadow-slate-900/10 h-11 px-8 transition-transform active:scale-95">
-                                            Complete Setup
+                                            Complete Onboarding
                                         </Button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Step 5: Success Completion */}
-                            {step === 5 && (
+                            {/* Step 6: Success Completion */}
+                            {step === 6 && (
                                 <div className="p-10 md:p-14 text-center flex flex-col items-center justify-center min-h-[400px]">
                                     <motion.div
                                         initial={{ scale: 0, opacity: 0 }}

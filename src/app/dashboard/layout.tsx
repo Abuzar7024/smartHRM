@@ -8,7 +8,7 @@ const Sidebar = dynamic(() => import("@/components/Sidebar").then(mod => mod.Sid
     ssr: false,
     loading: () => <div className="w-64 bg-slate-900 animate-pulse h-screen hidden lg:block" />
 });
-import { Settings, LogOut, Menu, X, Bell, Moon, Sun, Monitor, User, AlertTriangle, Building2, Hourglass, Loader2, Info, Wallet, Lock, CreditCard } from "lucide-react";
+import { Settings, LogOut, Menu, X, Bell, Moon, Sun, Monitor, User, AlertTriangle, Building2, Hourglass, Loader2, Info, Wallet, Lock, CreditCard, Clock as ClockIcon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils"; // Assuming this path for cn utility
@@ -362,6 +362,8 @@ export default function DashboardLayout({
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-6">
+                        {/* ── Compact Timeclock (Employee Only) ── */}
+                        {role === "employee" && <TimeclockHeader />}
                         {/* Real-time Notifications */}
                         <div
                             className="relative"
@@ -519,6 +521,113 @@ export default function DashboardLayout({
                 </main>
                 <AnnouncementPopup />
             </div>
+        </div>
+    );
+}
+
+function TimeclockHeader() {
+    const { user } = useAuth();
+    const { attendance, clockIn, clockOut, takeBreak, endBreak } = useApp();
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const todayStr = new Date().toDateString();
+    const myTodayRecords = attendance
+        .filter(a => a.empEmail === user?.email && new Date(a.timestamp).toDateString() === todayStr)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const lastRecord = myTodayRecords[myTodayRecords.length - 1];
+    const lastType = lastRecord?.type as string | undefined;
+    const isClockedIn = lastType === "Clock In" || lastType === "Break End";
+    const isClockedOut = lastType === "Clock Out";
+    const isOnBreak = lastType === "Break Start";
+    const hasAnyRecord = myTodayRecords.length > 0;
+
+    let totalWorkedMs = 0;
+    let currentClockIn: number | null = null;
+    let currentBreakStart: number | null = null;
+
+    myTodayRecords.forEach(record => {
+        const ts = new Date(record.timestamp).getTime();
+        const t = record.type as string;
+        if (t === "Clock In" || t === "Break End") {
+            currentClockIn = ts;
+            currentBreakStart = null;
+        } else if (t === "Clock Out" && currentClockIn !== null) {
+            totalWorkedMs += ts - currentClockIn;
+            currentClockIn = null;
+        } else if (t === "Break Start" && currentClockIn !== null) {
+            totalWorkedMs += ts - currentClockIn;
+            currentClockIn = null;
+            currentBreakStart = ts;
+        } else if (t === "Break End" && currentBreakStart !== null) {
+            currentBreakStart = null;
+        }
+    });
+
+    if (isClockedIn && currentClockIn !== null) totalWorkedMs += now - currentClockIn;
+
+    const fmtMinimal = (ms: number) => {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    };
+
+    if (isClockedOut) return (
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full">
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shift Terminated</span>
+        </div>
+    );
+
+    return (
+        <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end gap-0.5 mr-1">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none">Session Clock</span>
+                <span className="text-xs font-mono font-black text-slate-900 leading-none">{fmtMinimal(totalWorkedMs)}</span>
+            </div>
+
+            {!hasAnyRecord && (
+                <button
+                    onClick={() => clockIn(user!.email!)}
+                    className="h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2 active:scale-95"
+                >
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Clock In
+                </button>
+            )}
+
+            {isClockedIn && (
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => takeBreak(user!.email!)}
+                        className="h-9 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95"
+                    >
+                        ☕ Break
+                    </button>
+                    <button
+                        onClick={() => clockOut(user!.email!)}
+                        className="h-9 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2 active:scale-95"
+                    >
+                        Finish
+                    </button>
+                </div>
+            )}
+
+            {isOnBreak && (
+                <button
+                    onClick={() => endBreak(user!.email!)}
+                    className="h-9 px-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2 active:scale-95"
+                >
+                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    Resume
+                </button>
+            )}
         </div>
     );
 }

@@ -39,6 +39,7 @@ export type Employee = {
     tds?: string;
     insuranceOpted?: boolean;
     insuranceAmount?: string;
+    profileUpdateApproved?: boolean;
 };
 export type Leave = { id?: string; empName: string; empEmail: string; type: string; isHalfDay?: boolean; halfDayPeriod?: "First Half" | "Second Half"; days?: number; from: string; to: string; status: "Approved" | "Pending" | "Denied"; description: string; companyName?: string; appliedAt?: string };
 export type Payroll = { id?: string; name: string; department: string; amount: string; status: string; date: string; empEmail: string; transactionId: string };
@@ -71,7 +72,7 @@ export type EmployeeDocument = { id?: string; empEmail: string; title: string; s
 export type NotificationItem = { id?: string; title: string; message: string; timestamp: string; isRead: boolean; targetEmail?: string; targetRole?: "employer" | "employee" };
 export type DocTemplate = { id?: string; title: string; required: boolean };
 export type Team = { id?: string; name: string; leaderEmail: string; memberEmails: string[]; teamType: "Permanent" | "Project-Based"; hierarchy: "Flat" | "Hierarchical" | "Matrix"; createdAt: string; };
-export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; companyName?: string; replyToId?: string; reaction?: string; };
+export type ChatMessage = { id?: string; sender: string; receiver: string; text: string; timestamp: string; companyName?: string; replyToId?: string; reaction?: string; status?: "sent" | "delivered" | "read" };
 export type Job = { id?: string; title: string; department: string; applicants: number; type: string; postedAt: string; status: "Active" | "Closed" };
 export type ProfileUpdateRequest = { id?: string; empId: string; empEmail: string; empName: string; fields: Partial<Employee>; status: "Pending" | "Approved" | "Rejected"; requestedAt: string; companyName?: string; };
 export type LeaveBalance = { id?: string; empEmail: string; type: string; balance: number; year: number; companyName?: string };
@@ -212,6 +213,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         if (!companyName) {
+            // For employees without a companyName set yet, try to load just their own record by email
+            if (user?.email && role === "employee") {
+                const q = query(collection(db, "employees"), where("email", "==", user.email));
+                const unsub = onSnapshot(q, (snap) => {
+                    const records = snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee));
+                    if (records.length > 0) {
+                        setEmployees(records);
+                    }
+                }, (e) => console.log("Fallback employee fetch error:", e.message));
+                return () => unsub();
+            }
             // Clear all data if there is no company context (logged out or unassigned)
             setEmployees([]);
             setLeaves([]);
@@ -234,6 +246,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const unsubEmployees = onSnapshot(query(collection(db, "employees"), where("companyName", "==", companyName)), (snapshot) => {
                 setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
             }, (error) => console.log("Firebase Employees Error Setup:", error.message));
+
 
             const unsubLeaves = onSnapshot(
                 role === "employer"
@@ -544,11 +557,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             const req = profileUpdates.find(r => r.id === requestId);
             if (!req) return;
-            await updateDoc(doc(db, "employees", req.empId), req.fields);
+            // Apply the requested changes AND set the unlock flag so the employee can make one more edit
+            await updateDoc(doc(db, "employees", req.empId), { ...req.fields, profileUpdateApproved: true });
             await updateDoc(doc(db, "profile_updates", requestId), { status: "Approved" });
             await addDoc(collection(db, "notifications"), {
                 title: "Profile Update Approved",
-                message: "Your profile update request has been approved and applied.",
+                message: "Your profile update request has been approved. You may now make further changes if needed.",
                 timestamp: new Date().toISOString(),
                 isRead: false,
                 targetEmail: req.empEmail,
@@ -1353,13 +1367,22 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const chatReadDocRef = doc(db, "chat_reads", key);
             await updateDoc(chatReadDocRef, { readAt: now, myEmail, contactEmail }).catch(async (error) => {
                 if (error.code === "not-found") {
-                    // Document doesn't exist yet — create it
                     await setDoc(chatReadDocRef, { myEmail, contactEmail, readAt: now });
                 } else {
                     throw error;
                 }
             });
             setChatReadTimestamps(prev => ({ ...prev, [contactEmail]: now }));
+
+            // Update individual messages as read
+            const unreadMessages = chatMessages.filter(m => m.sender === contactEmail && m.receiver === myEmail && m.status !== "read");
+            if (unreadMessages.length > 0) {
+                const batch = writeBatch(db);
+                unreadMessages.forEach(m => {
+                    if (m.id) batch.update(doc(db, "chat_messages", m.id), { status: "read" });
+                });
+                await batch.commit();
+            }
         } catch (e) {
             console.error("Error marking chat read:", e);
         }
@@ -1392,7 +1415,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await addDoc(collection(db, "chat_messages"), {
                 ...msg,
                 companyName: companyName,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                status: "sent"
             });
         } catch (e) {
             console.error("Error sending message:", e);
