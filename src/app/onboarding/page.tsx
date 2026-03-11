@@ -95,10 +95,13 @@ export default function OnboardingFlow() {
     }, [employee.name, user?.email]);
 
     const nextStep = () => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/;
+
         // Validation before proceeding
         if (step === 1) {
-            if (!company.name.trim()) {
-                setErrors({ company: "Company name is required." });
+            if (!company.name.trim() || company.name.length < 2) {
+                setErrors({ company: "Please enter a valid company name (at least 2 letters)." });
                 return;
             }
             checkCompanyExists(company.name).then(exists => {
@@ -112,9 +115,13 @@ export default function OnboardingFlow() {
         }
         if (step === 2) {
             const stepErrors: Record<string, string> = {};
-            if (!company.regNo.trim()) stepErrors.regNo = "Registration Number is required for verification.";
-            if (!company.address.trim()) stepErrors.address = "Business address is required.";
+            const taxRegex = /^[a-zA-Z0-9]{15}$/;
+            if (!company.regNo.trim()) stepErrors.regNo = "Tax ID is required.";
+            else if (!taxRegex.test(company.regNo)) stepErrors.regNo = "Valid 15-digit alphanumeric GST is required.";
+
+            if (!company.address.trim() || company.address.length < 10) stepErrors.address = "Complete business address is required.";
             if (!company.website.trim()) stepErrors.website = "Company website is required.";
+            else if (!urlRegex.test(company.website)) stepErrors.website = "Enter a valid URL (e.g. acme.com).";
 
             if (Object.keys(stepErrors).length > 0) {
                 setErrors(stepErrors);
@@ -122,10 +129,22 @@ export default function OnboardingFlow() {
             }
         }
         if (step === 3) {
-            if (!employee.name.trim() && employee.email.trim()) {
-                setErrors({ employee: "Name is required if email is provided." });
+            const stepErrors: Record<string, string> = {};
+            if (employee.email.trim() && !employee.name.trim()) {
+                stepErrors.employee = "Full Name is required for invitations.";
+            } else if (employee.email.trim() && !emailRegex.test(employee.email)) {
+                stepErrors.employee = "Please enter a valid business email.";
+            } else if (employee.name.trim() && !employee.email.trim()) {
+                stepErrors.employee = "Email is required to send invitations.";
+            }
+
+            if (Object.keys(stepErrors).length > 0) {
+                setErrors(stepErrors);
                 return;
             }
+        }
+        if (step === 4) {
+            // Step 4 is payroll, which has defaults
         }
 
         setErrors({});
@@ -358,7 +377,8 @@ export default function OnboardingFlow() {
                                                     autoFocus
                                                     placeholder="VERIFY-1234-5678"
                                                     value={company.regNo}
-                                                    onChange={e => setCompany({ ...company, regNo: e.target.value.toUpperCase() })}
+                                                    maxLength={15}
+                                                    onChange={e => setCompany({ ...company, regNo: e.target.value.toUpperCase().slice(0, 15) })}
                                                     className={cn("h-11 rounded-xl border-slate-200 pl-10", errors.regNo && "border-rose-300 bg-rose-50")}
                                                 />
                                             </div>

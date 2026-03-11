@@ -53,35 +53,46 @@ export async function DELETE() {
 
         console.log(`Starting full deletion for company: ${companyName}`);
 
+        const authPurgeList = new Set<string>();
+        authPurgeList.add(uid); // Ensure employer is in the list
+
         for (const col of collections) {
             const snapshot = await adminDb.collection(col).where('companyName', '==', companyName).get();
             const batch = adminDb.batch();
 
-            // For 'users' collection, we also need to delete their Auth accounts
-            if (col === 'users') {
-                for (const doc of snapshot.docs) {
-                    try {
-                        await adminAuth.deleteUser(doc.id);
-                        console.log(`Deleted Auth Account: ${doc.id}`);
-                    } catch (e) {
-                        console.warn(`Could not delete Auth Account ${doc.id}:`, e);
-                    }
-                    batch.delete(doc.ref);
+            for (const doc of snapshot.docs) {
+                if (col === 'users') {
+                    authPurgeList.add(doc.id);
                 }
-            } else {
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                batch.delete(doc.ref);
             }
 
             await batch.commit();
             console.log(`Deleted ${snapshot.size} records from ${col}`);
         }
 
-        // Special case: Delete the company record from the search registry
+        // 2. Clear Auth Accounts (Staff + Employer)
+        console.log(`Purging ${authPurgeList.size} Auth Accounts...`);
+        for (const targetUid of authPurgeList) {
+            try {
+                await adminAuth.deleteUser(targetUid);
+                console.log(`Purged Auth Account: ${targetUid}`);
+            } catch (e) {
+                console.warn(`Auth Account ${targetUid} already purged or missing.`);
+            }
+        }
+
+        // Special case: Delete the company record (Registry)
         const companyRefs = await adminDb.collection('companies').where('name', '==', companyName).get();
-        const companyBatch = adminDb.batch();
-        companyRefs.docs.forEach(doc => companyBatch.delete(doc.ref));
-        await companyBatch.commit();
-        console.log(`Deleted ${companyRefs.size} organization registry entries for: ${companyName}`);
+        const registryBatch = adminDb.batch();
+        companyRefs.docs.forEach(doc => registryBatch.delete(doc.ref));
+
+        // Also explicitly delete by UID if owner document exists
+        const ownerCompanyDoc = adminDb.collection('companies').doc(uid);
+        registryBatch.delete(ownerCompanyDoc);
+
+        await registryBatch.commit();
+        console.log(`Deleted organization registry entries for: ${companyName}`);
 
         // Finally delete the employer themselves if they weren't in the lists above (unlikely as they should be in 'users')
         // But the loop above already handles it if they are in 'users' with companyName.

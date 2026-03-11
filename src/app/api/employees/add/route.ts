@@ -61,7 +61,7 @@ export async function POST(request: Request) {
             email,
             role: 'employee',
             companyName: companyName,
-            status: 'pending', // Key for invitation flow
+            status: 'active', // Direct access for newly added staff
             createdAt: new Date(),
         });
 

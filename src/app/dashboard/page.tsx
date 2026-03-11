@@ -175,26 +175,6 @@ export default function DashboardOverview() {
         ? new Date(firstClockIn.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         : null;
 
-    // ── Pending status gate ──
-    if (status === "pending") {
-        return (
-            <div className="flex items-center justify-center min-h-[70vh] p-4 md:p-8">
-                <Card className="max-w-md w-full">
-                    <CardHeader className="text-center pt-8">
-                        <CardTitle className="text-xl font-bold text-slate-900">Account Pending Approval</CardTitle>
-                        <CardDescription className="text-slate-500 mt-2">
-                            Your employer needs to approve your account before you can access the dashboard.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pb-8 text-center">
-                        <Button onClick={handleAcceptInvitation} disabled={accepting} className="mt-4">
-                            {accepting ? "Processing..." : "Accept Invitation"}
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-6">

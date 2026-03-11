@@ -166,7 +166,7 @@ export default function DashboardLayout({
     if (!user) return null;
 
     // ─────────────────────────────────────────────────────────
-    // WAITING SCREEN (For Pending Employees)
+    // WAITING SCREEN (Role-aware)
     // ─────────────────────────────────────────────────────────
     if (status === "pending") {
         return (
@@ -188,15 +188,21 @@ export default function DashboardLayout({
                         <Hourglass className="w-10 h-10 text-indigo-600 animate-pulse" />
                     </div>
 
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Pending</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                        {role === "employer" ? "Verification in Progress" : "Access Pending"}
+                    </h1>
                     <p className="text-slate-500 mb-8 leading-relaxed">
-                        Your account has been created successfully, but requires approval from your organization's administrator before you can access the dashboard.
+                        {role === "employer"
+                            ? "Your organization's registration is being verified by the SmartHR legal team. This process ensures platform security and usually takes 2-4 business hours."
+                            : "Your account has been created successfully, but requires approval from your organization's administrator before you can access the dashboard."}
                     </p>
 
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-8 text-left flex items-start gap-4">
                         <Building2 className="w-6 h-6 text-slate-400 mt-1 flex-shrink-0" />
                         <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Requested Organization</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                {role === "employer" ? "Organization Identity" : "Requested Organization"}
+                            </p>
                             <p className="text-sm font-semibold text-slate-800">{companyName || "Unknown Company"}</p>
                         </div>
                     </div>
@@ -207,7 +213,7 @@ export default function DashboardLayout({
                             disabled
                         >
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Waiting for Approval...
+                            {role === "employer" ? "Verifying Credentials..." : "Waiting for Approval..."}
                         </button>
                         <button
                             onClick={logout}

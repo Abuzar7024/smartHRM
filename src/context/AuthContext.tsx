@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export type Role = "employer" | "employee" | null;
@@ -36,33 +36,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                try {
-                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                // Real-time listener for user profile
+                const profileUnsub = onSnapshot(doc(db, "users", currentUser.uid), (userDoc) => {
                     if (userDoc.exists()) {
                         const data = userDoc.data();
                         setRole(data.role as Role);
                         setStatus(data.status || "active");
                         setCompanyName(data.companyName || null);
                     } else {
+                        // Default to employee if profile missing
                         setRole("employee");
                         setStatus("active");
                         setCompanyName(null);
                     }
-                } catch (error) {
-                    console.error("Error fetching user details", error);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error listening to user details", error);
                     setRole("employee");
                     setStatus("active");
-                    setCompanyName(null);
-                }
+                    setLoading(false);
+                });
+
+                return () => profileUnsub();
             } else {
                 setRole(null);
                 setStatus(null);
                 setCompanyName(null);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();

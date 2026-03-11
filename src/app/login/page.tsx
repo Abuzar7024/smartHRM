@@ -51,17 +51,23 @@ export default function LoginPage() {
     };
 
     const validateRegStep = () => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/;
+
         if (regStep === 1) {
             if (!email || !password) { setError("Email and password are required."); return false; }
-            if (password.length < 6) { setError("Password should be at least 6 characters."); return false; }
+            if (!emailRegex.test(email)) { setError("Please enter a valid work email address."); return false; }
+            if (password.length < 8) { setError("Security requirement: Password must be at least 8 characters."); return false; }
             setError("");
             return true;
         }
         if (regStep === 2) {
-            if (!companyName.trim()) { setError("Organization name is required."); return false; }
-            if (!regNo.trim()) { setError("Tax ID / Reg Number is required."); return false; }
-            if (!address.trim()) { setError("Registered office address is required."); return false; }
+            const taxRegex = /^[a-zA-Z0-9]{15}$/;
+            if (!companyName.trim() || companyName.length < 2) { setError("Please enter a valid organization name."); return false; }
+            if (!taxRegex.test(regNo)) { setError("Valid 15-digit alphanumeric Tax ID / GST is required."); return false; }
+            if (!address.trim() || address.length < 10) { setError("Please provide a complete registered office address."); return false; }
             if (!website.trim()) { setError("Company website is required."); return false; }
+            if (!urlRegex.test(website)) { setError("Please enter a valid website URL (e.g., https://acme.org)."); return false; }
             if (!termsAccepted) { setError("Please accept the Terms of Service to proceed."); return false; }
             setError("");
             return true;
@@ -100,9 +106,9 @@ export default function LoginPage() {
                 const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
                 if (!userSnap.empty) {
                     const data = userSnap.docs[0].data();
-                    if (data.status === "pending") {
+                    if (data.status === "rejected") {
                         await auth.signOut();
-                        setError("Your organization registration is currently being verified.");
+                        setError("Your access has been denied by the administration.");
                         setLoading(false);
                         return;
                     }
@@ -118,7 +124,7 @@ export default function LoginPage() {
                     email: user.email,
                     role: "employer",
                     companyName,
-                    status: "active",
+                    status: "pending",
                     createdAt: new Date(),
                     emailVerified: false,
                     regNo,
@@ -136,12 +142,21 @@ export default function LoginPage() {
                     createdAt: new Date().toISOString(),
                 });
 
-                setMsg("Welcome! Please check your email to verify your identity.");
-                setRegStep(3);
-                setLoading(false);
-                return;
+                // Automated Instant Login after registration
+                const idToken = await user.getIdToken();
+                const sessionRes = await fetch("/api/auth/session", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ idToken }),
+                });
+
+                if (sessionRes.ok) {
+                    router.push("/dashboard");
+                    return;
+                }
             }
 
+            // ... existing session logic for isLogin ...
             const idToken = await user!.getIdToken();
             const response = await fetch("/api/auth/session", {
                 method: "POST",
@@ -331,7 +346,8 @@ export default function LoginPage() {
                                                         <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Tax ID / GST</Label>
                                                         <Input
                                                             value={regNo}
-                                                            onChange={e => setRegNo(e.target.value.toUpperCase())}
+                                                            maxLength={15}
+                                                            onChange={e => setRegNo(e.target.value.toUpperCase().slice(0, 15))}
                                                             placeholder="Number"
                                                             className="bg-slate-50 border-slate-100 h-11 rounded-xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-600/30 transition-all text-sm font-medium"
                                                         />

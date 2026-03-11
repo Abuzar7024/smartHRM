@@ -102,10 +102,45 @@ export function AddEmployeeForm({ onClose, employeeLimit, currentEmployeeCount, 
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!empName || !empEmail || !empPassword) return;
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        // Reset errors
+        setError("");
+        setErrorField(null);
+
+        // Validation engine
+        if (!empName || empName.length < 2) {
+            setError("Full legal name is required.");
+            setErrorField("name");
+            return;
+        }
+
+        if (!empEmail || !emailRegex.test(empEmail)) {
+            setError("A valid corporate email address is required.");
+            setErrorField("email");
+            return;
+        }
+
+        if (!empPassword || empPassword.length < 8) {
+            setError("Security Requirement: Password must be at least 8 characters.");
+            setErrorField("password");
+            return;
+        }
+
+        if (!ctc || Number(ctc) <= 0) {
+            setError("Annual CTC must be a positive numeric value.");
+            setErrorField("ctc");
+            return;
+        }
+
+        if (!empDept) {
+            setError("Please assign a primary department.");
+            setErrorField("dept");
+            return;
+        }
 
         setLoading(true);
-        setError("");
 
         try {
             const response = await fetch('/api/employees/add', {
@@ -254,10 +289,11 @@ export function AddEmployeeForm({ onClose, employeeLimit, currentEmployeeCount, 
                                     type="number"
                                     placeholder="e.g. 1200000"
                                     value={ctc}
-                                    onChange={e => setCtc(e.target.value)}
+                                    onChange={e => { setCtc(e.target.value); if (errorField === "ctc") { setErrorField(null); setError(""); } }}
                                     required
-                                    className="rounded-lg h-10"
+                                    className={cn("rounded-lg h-10", errorField === "ctc" && "border-rose-300 bg-rose-50")}
                                 />
+                                {errorField === "ctc" && <p className="text-[10px] text-rose-600 font-bold mt-1 px-1">{error}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-bold text-slate-600">Monthly PF (₹)</Label>
