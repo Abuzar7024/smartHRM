@@ -243,15 +243,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         try {
-            const unsubEmployees = onSnapshot(query(collection(db, "employees"), where("companyName", "==", companyName)), (snapshot) => {
+            const unsubEmployees = onSnapshot(query(collection(db, "employees"), where("companyName", "==", companyName), limit(500)), (snapshot) => {
                 setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
             }, (error) => console.log("Firebase Employees Error Setup:", error.message));
 
 
             const unsubLeaves = onSnapshot(
                 role === "employer"
-                    ? query(collection(db, "leaves"), where("companyName", "==", companyName))
-                    : query(collection(db, "leaves"), where("companyName", "==", companyName), where("empEmail", "==", user?.email)),
+                    ? query(collection(db, "leaves"), where("companyName", "==", companyName), limit(200))
+                    : query(collection(db, "leaves"), where("companyName", "==", companyName), where("empEmail", "==", user?.email), limit(200)),
                 (snapshot) => {
                     const leavesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Leave));
                     setLeaves(leavesData.sort((a, b) => new Date(b.from).getTime() - new Date(a.from).getTime()));
@@ -259,8 +259,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
             const unsubPayroll = onSnapshot(
                 role === "employer"
-                    ? query(collection(db, "payroll"), where("companyName", "==", companyName))
-                    : query(collection(db, "payroll"), where("companyName", "==", companyName), where("empEmail", "==", user?.email)),
+                    ? query(collection(db, "payroll"), where("companyName", "==", companyName), limit(200))
+                    : query(collection(db, "payroll"), where("companyName", "==", companyName), where("empEmail", "==", user?.email), limit(200)),
                 (snapshot) => {
                     setPayroll(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
                 }, (error) => console.log("Firebase Payroll Error Setup:", error.message)
@@ -271,15 +271,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 setAttendance(attData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             }, (error) => console.log("Firebase Attendance Error Setup:", error.message));
 
-            const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("companyName", "==", companyName)), (snapshot) => {
+            const unsubTasks = onSnapshot(query(collection(db, "tasks"), where("companyName", "==", companyName), limit(200)), (snapshot) => {
                 const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
                 setTasks(tData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             }, (error) => console.log("Firebase Tasks Error Setup:", error.message));
 
             const unsubDocuments = onSnapshot(
                 role === "employer"
-                    ? query(collection(db, "documents"), where("companyName", "==", companyName))
-                    : query(collection(db, "documents"), where("companyName", "==", companyName), where("empEmail", "==", user?.email)),
+                    ? query(collection(db, "documents"), where("companyName", "==", companyName), limit(200))
+                    : query(collection(db, "documents"), where("companyName", "==", companyName), where("empEmail", "==", user?.email), limit(200)),
                 (snapshot) => {
                     setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument)));
                 }, (error) => console.log("Firebase Docs Error Setup:", error.message));
