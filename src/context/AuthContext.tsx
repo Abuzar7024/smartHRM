@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, applyActionCode } from "firebase/auth";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -34,6 +34,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [status, setStatus] = useState<string | null>(null);
     const [companyName, setCompanyName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Handle email verification action codes
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode');
+        const oobCode = urlParams.get('oobCode');
+
+        if (mode === 'verifyEmail' && oobCode) {
+            applyActionCode(auth, oobCode)
+                .then(() => {
+                    // Email verified successfully
+                    // Remove the query params from URL
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('mode');
+                    url.searchParams.delete('oobCode');
+                    window.history.replaceState({}, '', url.toString());
+                    // Optionally show a success message or redirect
+                    alert('Email verified successfully! You can now log in.');
+                })
+                .catch((error) => {
+                    console.error('Error verifying email:', error);
+                    alert('Error verifying email. Please try again or contact support.');
+                });
+        }
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {

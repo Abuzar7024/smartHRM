@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, query, collection, where, getDocs, addDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, query, collection, where, getDocs, addDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -103,14 +103,22 @@ export default function LoginPage() {
                     return;
                 }
 
-                const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", user.uid)));
-                if (!userSnap.empty) {
-                    const data = userSnap.docs[0].data();
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+                if (userSnap.exists()) {
+                    const data = userSnap.data();
                     if (data.status === "rejected") {
                         await auth.signOut();
                         setError("Your access has been denied by the administration.");
                         setLoading(false);
                         return;
+                    }
+                    if (data.status === "pending" && user.emailVerified) {
+                        await updateDoc(userDocRef, {
+                            status: "active",
+                            emailVerified: true,
+                            verificationStatus: "verified"
+                        });
                     }
                 }
             } else {
