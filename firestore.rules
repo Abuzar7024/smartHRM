@@ -33,53 +33,37 @@ service cloud.firestore {
 
     // ── 1. Users ───────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isAuth();
-      allow create: if isAuth() && request.auth.uid == userId;
-      allow update: if isAuth() && (request.auth.uid == userId || isEmployer());
-      allow delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 2. Employees ───────────────────────────────────────────────
     match /employees/{docId} {
-      allow read: if true;
-      allow create: if isEmployer() || (isAuth() && request.resource.data.email == callerEmail());
-      allow update: if isEmployer() || isOwner(resource.data.email);
-      allow delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 3. Leaves ──────────────────────────────────────────────────
     match /leaves/{leaveId} {
-      allow read: if isAuth() && (isEmployer() || isOwner(resource.data.empEmail));
-      allow create: if isAuth();
-      allow update, delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 4. Payroll ─────────────────────────────────────────────────
     match /payroll/{payId} {
-      allow read: if isAuth() && (isEmployer() || isOwner(resource.data.empEmail));
-      allow write:  if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 5. Documents ───────────────────────────────────────────────
     match /documents/{docId} {
-      allow read: if isAuth() && (isEmployer() || isOwner(resource.data.empEmail));
-      allow create: if isAuth() && (isEmployer() || isOwner(request.resource.data.empEmail));
-      allow update: if isAuth() && (isEmployer() || isOwner(resource.data.empEmail));
-      allow delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 6. Attendance ──────────────────────────────────────────────
     match /attendance/{attId} {
-      allow read: if isAuth();
-      allow create: if isAuth() && isOwner(request.resource.data.empEmail);
-      allow update, delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 7. Tasks ───────────────────────────────────────────────────
     match /tasks/{taskId} {
-      allow read: if isAuth();
-      allow create, update: if isAuth();
-      allow delete: if isEmployer();
+      allow read, write: if isAuth();
     }
 
     // ── 8. Profile / System ────────────────────────────────────────
@@ -91,12 +75,12 @@ service cloud.firestore {
     match /leave_balances/{id}    { allow read, write: if isAuth(); }
     match /doc_templates/{id}     { allow read, write: if isAuth(); }
     match /hierarchy/{id}         { allow read, write: if isAuth(); }
-    match /announcements/{id}     { allow read: if isAuth(); allow write: if isEmployer(); }
+    match /announcements/{id}     { allow read, write: if isAuth(); }
 
     // ── 9. Employer-Only ───────────────────────────────────────────
-    match /companies/{id}         { allow read: if true; allow write: if isEmployer(); }
-    match /companySettings/{id}   { allow read: if isAuth(); allow write: if isEmployer(); }
-    match /teams/{id}             { allow read: if isAuth(); allow write: if isEmployer(); }
-    match /jobs/{id}              { allow read: if isAuth(); allow write: if isEmployer(); }
+    match /companies/{id}         { allow read, write: if isAuth(); }
+    match /companySettings/{id}   { allow read, write: if isAuth(); }
+    match /teams/{id}             { allow read, write: if isAuth(); }
+    match /jobs/{id}              { allow read, write: if isAuth(); }
   }
 }
