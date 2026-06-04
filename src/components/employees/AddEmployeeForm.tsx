@@ -162,7 +162,25 @@ export function AddEmployeeForm({ onClose, employeeLimit, currentEmployeeCount, 
             });
 
             if (response.ok) {
-                toast.success("Employee Successfully Onboarded!", { description: `${empName} has been added to the Workforce Database.` });
+                const data = await response.json();
+                const inviteLink = data.inviteLink;
+
+                toast.success("Employee Successfully Onboarded!", { 
+                    description: `${empName} has been added to the Workforce Database.` 
+                });
+
+                if (inviteLink) {
+                    // Try to copy to clipboard
+                    try {
+                        await navigator.clipboard.writeText(inviteLink);
+                        toast.success("Invitation Link Copied!", {
+                            description: "The login link has been copied to your clipboard. Send it to the employee."
+                        });
+                    } catch (e) {
+                        console.error("Clipboard failed", e);
+                    }
+                }
+
                 createNotification({
                     title: "System Onboarding Success",
                     message: `Operative ${empName} (${empEmail}) was added to the ${empDept} unit as a ${empRole}.`,

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, applyActionCode } from "firebase/auth";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged, User, applyActionCode, sendEmailVerification } from "firebase/auth";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export type Role = "employer" | "employee" | null;
@@ -43,15 +43,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (mode === 'verifyEmail' && oobCode) {
             applyActionCode(auth, oobCode)
-                .then(() => {
-                    // Email verified successfully
+                .then(async () => {
+                    // If we have a user logged in, reload them
+                    if (auth.currentUser) {
+                        await auth.currentUser.reload();
+                        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+                        if (userDoc.exists()) {
+                            const data = userDoc.data();
+                            // If they are an employer, auto-activate them
+                            if (data.role === "employer") {
+                                await updateDoc(doc(db, "users", auth.currentUser.uid), {
+                                    status: "active",
+                                    emailVerified: true
+                                });
+                            } else {
+                                await updateDoc(doc(db, "users", auth.currentUser.uid), {
+                                    emailVerified: true
+                                });
+                            }
+                        }
+                    }
+                    
                     // Remove the query params from URL
                     const url = new URL(window.location.href);
                     url.searchParams.delete('mode');
                     url.searchParams.delete('oobCode');
                     window.history.replaceState({}, '', url.toString());
-                    // Optionally show a success message or redirect
-                    alert('Email verified successfully! You can now log in.');
+                    
+                    // get the role if possible to decide redirection
+                    let targetUrl = "/dashboard";
+                    if (auth.currentUser) {
+                        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+                        if (userDoc.exists() && userDoc.data().role === "employee") {
+                            targetUrl = "/login?msg=verified";
+                        }
+                    }
+
+                    alert('Email verified successfully!');
+                    window.location.href = targetUrl;
                 })
                 .catch((error) => {
                     console.error('Error verifying email:', error);
@@ -65,23 +94,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(currentUser);
             if (currentUser) {
                 // Real-time listener for user profile
-                const profileUnsub = onSnapshot(doc(db, "users", currentUser.uid), (userDoc) => {
+                const profileUnsub = onSnapshot(doc(db, "users", currentUser.uid), async (userDoc) => {
                     if (userDoc.exists()) {
                         const data = userDoc.data();
+                        
+                        // FIX: If verified but still pending, auto-activate
+                        if (data.status === "pending" && currentUser.emailVerified && data.role === "employer") {
+                            await updateDoc(doc(db, "users", currentUser.uid), { status: "active" });
+                            setStatus("active");
+                        } else {
+                            setStatus(data.status || "active");
+                        }
+                        
                         setRole(data.role as Role);
-                        setStatus(data.status || "active");
                         setCompanyName(data.companyName || null);
                     } else {
-                        // Default to employee if profile missing
-                        setRole("employee");
-                        setStatus("active");
+                        // Profile missing - could be a newer user or an error in creation
+                        // We will set role to null here to signal that role is not determined
+                        setRole(null);
+                        setStatus(null);
                         setCompanyName(null);
                     }
                     setLoading(false);
                 }, (error) => {
                     console.error("Error listening to user details", error);
-                    setRole("employee");
-                    setStatus("active");
+                    setRole(null);
+                    setStatus(null);
                     setLoading(false);
                 });
 

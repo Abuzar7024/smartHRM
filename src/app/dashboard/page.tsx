@@ -103,7 +103,7 @@ export default function DashboardOverview() {
         { title: "Payslip Status", value: "Verified", icon: CheckCircle, color: "text-indigo-600", bg: "bg-indigo-50" },
     ];
 
-    const stats = role === "employer" ? employerStats : employeeStats;
+    const stats = role === "employer" ? employerStats : (role === "employee" ? employeeStats : []);
 
     // ── Live timer (ticks every second) ──
     const [now, setNow] = useState(Date.now());

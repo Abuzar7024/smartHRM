@@ -11,6 +11,8 @@ const Sidebar = dynamic(() => import("@/components/Sidebar").then(mod => mod.Sid
 import { Settings, LogOut, Menu, X, Bell, Moon, Sun, Monitor, User, AlertTriangle, Building2, Hourglass, Loader2, Info, Wallet, Lock, CreditCard, Clock as ClockIcon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
+import { sendEmailVerification } from "firebase/auth";
 import { cn } from "@/lib/utils"; // Assuming this path for cn utility
 import { motion, AnimatePresence } from "framer-motion"; // For animation
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
@@ -215,6 +217,30 @@ export default function DashboardLayout({
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             {role === "employer" ? "Verifying Credentials..." : "Waiting for Approval..."}
                         </button>
+
+                        {!user?.emailVerified && (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        if (auth.currentUser) {
+                                            await sendEmailVerification(auth.currentUser);
+                                            toast.success("Verification email sent!", {
+                                                description: "Please check your inbox and spam folder."
+                                            });
+                                        }
+                                    } catch (err: any) {
+                                        toast.error("Failed to send email", {
+                                            description: err.message
+                                           });
+                                    }
+                                }}
+                                className="w-full h-12 rounded-xl bg-indigo-50 text-indigo-600 font-semibold hover:bg-indigo-100 transition-colors flex items-center justify-center"
+                            >
+                                <Info className="w-4 h-4 mr-2" />
+                                Resend Verification Link
+                            </button>
+                        )}
+
                         <button
                             onClick={logout}
                             className="w-full h-12 rounded-xl bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors"

@@ -85,7 +85,14 @@ export async function POST(request: Request) {
             insuranceAmount: insuranceAmount || ""
         });
 
-        return NextResponse.json({ success: true, uid: userCredential.uid }, { status: 200 });
+        // 5. Generate Invitation Link
+        const actionCodeSettings = {
+            url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login`,
+            handleCodeInApp: true,
+        };
+        const inviteLink = await adminAuth.generateSignInWithEmailLink(email, actionCodeSettings);
+
+        return NextResponse.json({ success: true, uid: userCredential.uid, inviteLink }, { status: 200 });
 
     } catch (error) {
         console.error("Error creating employee account:", error);

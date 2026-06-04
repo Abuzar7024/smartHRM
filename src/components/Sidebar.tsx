@@ -86,7 +86,7 @@ function SidebarComponent({ onClose }: SidebarProps) {
         { name: "My Leaves", href: "/dashboard/leaves", icon: CalendarDays },
     ];
 
-    const navLinks = role === "employer" ? employerLinks : employeeLinks;
+    const navLinks = role === "employer" ? employerLinks : (role === "employee" ? employeeLinks : []);
 
     return (
         <motion.aside

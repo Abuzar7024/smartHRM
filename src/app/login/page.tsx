@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc, query, collection, where, getDocs, addDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +35,41 @@ export default function LoginPage() {
     const [regStep, setRegStep] = useState(1);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("msg") === "verified") {
+            setMsg("Verification successful! Please sign in to your account.");
+        }
+
+        // Handle Email Link Sign-in (Invitations)
+        if (isSignInWithEmailLink(auth, window.location.href)) {
+            let emailForLink = window.localStorage.getItem('emailForSignIn');
+            if (!emailForLink) {
+                emailForLink = window.prompt('Please provide your email for confirmation');
+            }
+            if (emailForLink) {
+                setLoading(true);
+                signInWithEmailLink(auth, emailForLink, window.location.href)
+                    .then(async (result) => {
+                        window.localStorage.removeItem('emailForSignIn');
+                        // Automated session creation
+                        const idToken = await result.user.getIdToken();
+                        await fetch("/api/auth/session", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ idToken }),
+                        });
+                        router.push("/dashboard");
+                    })
+                    .catch((err) => {
+                        setError("Invalid or expired invitation link.");
+                        console.error(err);
+                    })
+                    .finally(() => setLoading(false));
+            }
+        }
+    }, [router]);
 
     const handlePasswordReset = async () => {
         if (!email) { setError("Enter your registered email to receive a reset link."); return; }
@@ -96,6 +131,7 @@ export default function LoginPage() {
                 const cred = await signInWithEmailAndPassword(auth, email, password);
                 user = cred.user;
 
+                await user.reload();
                 if (!user.emailVerified) {
                     await auth.signOut();
                     setError("Identity not verified. Please check your email for the activation link.");
@@ -141,7 +177,7 @@ export default function LoginPage() {
                     verificationStatus: "pending"
                 });
 
-                await addDoc(collection(db, "companies"), {
+                await setDoc(doc(db, "companies", user.uid), {
                     name: companyName,
                     ownerEmail: user.email,
                     regNo,
@@ -159,7 +195,8 @@ export default function LoginPage() {
                 });
 
                 if (sessionRes.ok) {
-                    router.push("/dashboard");
+                    setRegStep(3);
+                    setLoading(false);
                     return;
                 }
             }
@@ -425,12 +462,37 @@ export default function LoginPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <Button
-                                                    onClick={() => { setIsLogin(true); setRegStep(1); setMsg(""); }}
-                                                    className="w-full h-12 bg-slate-900 text-white font-bold hover:bg-slate-800 rounded-xl transition-all shadow-[0_10px_30px_rgba(0,0,0,0.1)]"
-                                                >
-                                                    Back to Login
-                                                </Button>
+                                                 <div className="flex flex-col gap-3">
+                                                    <Button
+                                                        onClick={async () => {
+                                                            if (auth.currentUser) {
+                                                                setLoading(true);
+                                                                try {
+                                                                    await sendEmailVerification(auth.currentUser);
+                                                                    setMsg("Verification email resent!");
+                                                                } catch (err: any) {
+                                                                    setError(err.message);
+                                                                } finally {
+                                                                    setLoading(false);
+                                                                }
+                                                            } else {
+                                                                setError("Session expired. Please log in again.");
+                                                            }
+                                                        }}
+                                                        variant="outline"
+                                                        disabled={loading}
+                                                        className="w-full h-12 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 rounded-xl transition-all"
+                                                    >
+                                                        {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Mail className="w-4 h-4 mr-2" />}
+                                                        Resend Verification Email
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => { setIsLogin(true); setRegStep(1); setMsg(""); }}
+                                                        className="w-full h-12 bg-slate-900 text-white font-bold hover:bg-slate-800 rounded-xl transition-all shadow-[0_10px_30px_rgba(0,0,0,0.1)]"
+                                                    >
+                                                        Back to Login
+                                                    </Button>
+                                                </div>
                                             </motion.div>
                                         )}
                                     </>
